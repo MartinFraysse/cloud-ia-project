@@ -1,0 +1,147 @@
+# =============================================================================
+# .gitignore — Projets Cloud & Infrastructure as Code (ESIEA S9)
+#
+# Règle d'or : AUCUN secret, state ou identifiant propre à une session de lab
+# ne doit être versionné. En cas de doute, ignorer d'abord, puis documenter.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Terraform
+# -----------------------------------------------------------------------------
+# Répertoire de travail local (providers, modules téléchargés)
+**/.terraform/
+
+# State : contient les attributs des ressources, souvent des secrets en clair
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Plans sauvegardés (`terraform plan -out=...`), peuvent contenir des secrets
+*.tfplan
+*.plan
+tfplan
+
+# Valeurs réelles des variables (project_id, zone…) : propres à chaque session.
+# Seuls les modèles *.tfvars.example sont versionnés.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Surcharges locales
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Journaux et fichiers de configuration du CLI
+crash.log
+crash.*.log
+.terraformrc
+terraform.rc
+
+# NB : .terraform.lock.hcl EST versionné volontairement (épinglage des providers).
+
+
+# -----------------------------------------------------------------------------
+# Ansible
+# -----------------------------------------------------------------------------
+# Mot de passe Ansible Vault (les fichiers vault.yml chiffrés, eux, sont versionnés)
+.vault_pass
+.vault_pass.txt
+.vault_password
+vault_pass*
+vault-pass*
+*.vault_pass
+
+# Artefacts d'exécution
+*.retry
+.ansible/
+fact_cache/
+ansible.log
+
+# Collections et rôles installés via `ansible-galaxy install -r requirements.yml`
+**/collections/ansible_collections/
+**/roles/.galaxy_install_info
+
+
+# -----------------------------------------------------------------------------
+# Google Cloud
+# -----------------------------------------------------------------------------
+# Clés de comptes de service et identifiants
+*credentials*.json
+*service-account*.json
+*-sa-key*.json
+*.gcp-key.json
+application_default_credentials.json
+.gcloud/
+
+
+# -----------------------------------------------------------------------------
+# Clés SSH et certificats
+# -----------------------------------------------------------------------------
+# Générées au démarrage de l'environnement local ou par script, jamais committées
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+id_ecdsa*
+**/ssh-keys/
+**/.ssh/
+
+
+# -----------------------------------------------------------------------------
+# Kubernetes / Helm / minikube
+# -----------------------------------------------------------------------------
+kubeconfig
+*.kubeconfig
+.kube/
+
+# Packages de chart (`helm package`) et dépendances téléchargées
+*.tgz
+**/charts/*.tgz
+
+
+# -----------------------------------------------------------------------------
+# Docker / environnement local
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+compose.override.yml
+
+
+# -----------------------------------------------------------------------------
+# Python (environnement virtuel pour Ansible, ansible-lint…)
+# -----------------------------------------------------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+
+# -----------------------------------------------------------------------------
+# Éditeurs et systèmes d'exploitation
+# -----------------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# -----------------------------------------------------------------------------
+# Divers
+# -----------------------------------------------------------------------------
+*.log
+*.bak
+*.tmp
+tmp/
