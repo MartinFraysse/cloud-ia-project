@@ -1,0 +1,23 @@
+---
+# Rôle webserver — métadonnées et dépendances.
+# geerlingguy.nginx installe nginx et gère nginx.conf ; ce rôle gère le site Fleet Info.
+galaxy_info:
+  role_name: webserver
+  author: "Équipe Plateforme NovaRetail"
+  description: "Site nginx de Fleet Info + page /status protégée (enveloppe de geerlingguy.nginx)"
+  license: MIT
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+dependencies:
+  - role: geerlingguy.nginx
+    vars:
+      # Supprime le site "default" livré par Debian : il écoute aussi sur 80 en default_server,
+      # ce qui entrerait en conflit avec notre site (nginx -t échouerait : "duplicate default server")
+      nginx_remove_default_vhost: true
+      # On n'utilise pas le mécanisme de vhosts du rôle public (ses vhosts ne sont pas validés par nginx -t)
+      nginx_vhosts: []
+      # Masque la version de nginx dans les en-têtes HTTP et les pages d'erreur (réduit la surface d'attaque)
+      nginx_server_tokens: "off"

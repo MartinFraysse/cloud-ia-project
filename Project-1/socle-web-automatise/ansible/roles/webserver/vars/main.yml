@@ -1,0 +1,5 @@
+---
+# Rôle webserver — constantes internes (chemins Debian, non destinés à être surchargés).
+webserver_site_path: /etc/nginx/sites-enabled/fleetinfo.conf
+webserver_status_htpasswd_path: /etc/nginx/fleetinfo-status.htpasswd
+webserver_nginx_group: www-data   # groupe des workers nginx sous Debian : doit pouvoir lire le htpasswd

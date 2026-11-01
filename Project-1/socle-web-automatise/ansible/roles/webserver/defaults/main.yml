@@ -1,0 +1,12 @@
+---
+# Rôle webserver — valeurs par défaut (surchargeables). Préfixe "webserver_".
+
+# Port d'écoute HTTP du site (le firewall GCP et le docker-compose publient le 80)
+webserver_listen_port: 80
+
+# Racine servie : le lien symbolique "current" géré par le rôle fleetinfo.
+# nginx résout le lien à CHAQUE requête : basculer "current" ne demande aucun reload.
+webserver_document_root: /opt/fleetinfo/current
+
+# Compte autorisé sur /status
+webserver_status_user: "exploitation"

@@ -1,0 +1,18 @@
+---
+# Rôle : point d'entrée unique. Orchestre les rôles sur le groupe "web".
+# Identique en local et sur le cloud : seul l'inventaire (-i) change.
+- name: Vérifier la connectivité des serveurs web
+  hosts: web
+  gather_facts: false
+  tasks:
+    - name: Tester la connexion SSH et la présence de Python
+      ansible.builtin.ping:
+
+- name: Configurer les serveurs web du socle
+  hosts: web
+  become: true
+  roles:
+    - role: common
+      tags: [common]
+    - role: webserver
+      tags: [webserver]

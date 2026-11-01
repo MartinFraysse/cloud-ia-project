@@ -1,0 +1,25 @@
+---
+# defaults file for roles/common
+common_motd_footer: "Généré par Ansible (rôle common) - ne pas modifier à la main"
+# Rôle common — valeurs par défaut (précédence la PLUS FAIBLE : surchargeables partout).
+# Toutes les variables sont préfixées "common_" pour éviter les collisions entre rôles.
+
+# Paquets de base présents sur tout serveur
+common_packages:
+  - curl
+  - vim
+  - ca-certificates
+  - tzdata
+
+
+# Fuseau horaire du serveur (format IANA)
+common_timezone: "Europe/Paris"
+
+# Utilisateur d'exploitation (lecture des journaux, sans sudo : moindre privilège)
+common_ops_user: "fleetops"
+common_ops_user_groups:
+  - adm               # lecture de /var/log/* (dont les logs nginx)
+  - systemd-journal   # lecture de journalctl
+
+# Environnement affiché dans la bannière (variable globale d'inventaire)
+common_environment: "{{ socle_env | default('inconnu') }}"

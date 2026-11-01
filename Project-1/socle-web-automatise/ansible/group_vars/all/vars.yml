@@ -1,0 +1,9 @@
+---
+# Rôle : variables COMMUNES aux deux environnements (local et cloud).
+# Les secrets sont dans vault.yml (étape 4) et référencés ici en clair.
+
+# Version de l'application à déployer : LE seul endroit à modifier pour livrer une version
+fleetinfo_version: "1.0.0"
+
+# Mot de passe de la page /status (valeur réelle chiffrée dans vault.yml)
+webserver_status_password: "{{ vault_webserver_status_password }}"

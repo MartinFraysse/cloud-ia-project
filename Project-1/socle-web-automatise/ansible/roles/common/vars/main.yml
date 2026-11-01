@@ -1,0 +1,4 @@
+---
+# vars file for roles/common
+# Rôle common — constantes INTERNES (précédence forte : non destinées à être surchargées).
+common_motd_path: /etc/motd

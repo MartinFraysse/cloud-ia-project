@@ -1,0 +1,9 @@
+ssh/vault_pass.txt
+*.retry
+__pycache__/
+.ansible-lint-cache/
+local/ssh/
+local/node/authorized_keys
+.vault_pass*
+ansible/roles/geerlingguy.*
+.ansible/

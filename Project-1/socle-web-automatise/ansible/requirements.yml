@@ -1,0 +1,14 @@
+---
+# Rôle : dépendances Galaxy du projet, versions ÉPINGLÉES (reproductibilité).
+# Installation : cd ansible && ansible-galaxy install -r requirements.yml
+roles:
+  # Installation + nginx.conf. Justification dans docs/ (licence MIT, Debian supporté,
+  # nginx.conf validé par nginx -t ; les vhosts sont gérés par notre rôle "nginx").
+  - name: geerlingguy.nginx
+    version: "3.3.1"
+
+collections:
+  - name: google.cloud          # inventaire dynamique gcp_compute (étape cloud)
+    version: "1.4.1"            # ← version affichée par la commande ci-dessus
+  - name: community.general     # timezone (rôle common)
+    version: "9.5.2"

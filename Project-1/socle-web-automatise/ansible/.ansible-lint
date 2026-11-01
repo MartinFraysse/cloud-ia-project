@@ -1,0 +1,7 @@
+---
+# Rôle : configuration ansible-lint du projet.
+profile: moderate
+
+exclude_paths:
+  - .ansible/                  # cache où ansible-lint installe lui-même les dépendances de requirements.yml
+  - roles/geerlingguy.nginx/   # rôle public, non maintenu par nous (justifié dans docs/)

@@ -1,0 +1,30 @@
+# {{ ansible_managed }}  
+# Site Fleet Info : page d'accueil, contrôle de santé /health, statut technique /status.
+server {
+    # Pas de "listen [::]:..." : les conteneurs du banc n'ont pas d'IPv6, nginx refuserait de démarrer
+    listen {{ webserver_listen_port }} default_server;
+    server_name _;
+
+    root {{ webserver_document_root }};
+    index index.html;
+
+    access_log /var/log/nginx/fleetinfo.access.log;
+    error_log  /var/log/nginx/fleetinfo.error.log;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # Contrôle de santé : fichier JSON généré par le rôle fleetinfo dans la release active
+    location = /health {
+        try_files /health.json =404;
+    }
+
+    # Page technique nginx (connexions actives, requêtes traitées), protégée par mot de passe
+    location = /status {
+        stub_status;
+        auth_basic "Fleet Info - statut technique";
+        auth_basic_user_file {{ webserver_status_htpasswd_path }};
+        access_log off;
+    }
+}

@@ -1,0 +1,17 @@
+---
+# Rôle webserver — handlers, chaînés par notify (même mécanique que le lab handlers, ex. 4).
+# Chaîne : tâche template -> "Valider la configuration nginx" -> "Recharger nginx".
+# Si nginx -t échoue (code retour != 0), le handler est en échec : la chaîne s'arrête
+# et "Recharger nginx" n'est jamais exécuté. Une config invalide n'est donc jamais chargée.
+
+- name: Valider la configuration nginx
+  ansible.builtin.command: nginx -t
+  # Volontairement "changed" : c'est ce qui permet de notifier le handler suivant.
+  # Sans risque pour l'idempotence : ce handler ne s'exécute que si la config a déjà changé.
+  changed_when: true
+  notify: Recharger nginx
+
+- name: Recharger nginx
+  ansible.builtin.service:
+    name: nginx
+    state: reloaded

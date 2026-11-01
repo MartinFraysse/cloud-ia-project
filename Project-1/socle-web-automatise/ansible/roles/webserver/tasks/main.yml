@@ -1,0 +1,27 @@
+---
+# Rôle webserver — site nginx de Fleet Info et page /status protégée.
+# nginx lui-même (paquet, nginx.conf, service) est géré par la dépendance geerlingguy.nginx.
+
+- name: Installer passlib (bibliothèque requise par le module htpasswd)
+  ansible.builtin.apt:
+    name: python3-passlib
+    state: present
+
+- name: Créer le compte d'accès à la page /status
+  community.general.htpasswd:
+    path: "{{ webserver_status_htpasswd_path }}"
+    name: "{{ webserver_status_user }}"
+    password: "{{ webserver_status_password }}"
+    owner: root
+    group: "{{ webserver_nginx_group }}"
+    mode: "0640"          # lisible par nginx (www-data), illisible par les autres comptes
+  no_log: true            # le mot de passe n'apparaît jamais dans la sortie d'Ansible
+
+- name: Déployer la configuration du site Fleet Info
+  ansible.builtin.template:
+    src: fleetinfo.conf.j2
+    dest: "{{ webserver_site_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Valider la configuration nginx

@@ -1,0 +1,15 @@
+{
+  "name": "Socle Web Automatisé - local",
+  "dockerComposeFile": "../local/docker-compose.yml",
+  "service": "controller",
+  "workspaceFolder": "/workspace",
+  "containerEnv": {
+    "ANSIBLE_CONFIG": "/workspace/ansible/ansible.cfg",
+    "ANSIBLE_VAULT_PASSWORD_FILE": "/workspace/.vault_pass"
+  },
+  "postCreateCommand": "chmod 600 local/ssh/fleet_key && cd ansible && ansible-galaxy install -r requirements.yml",
+  "customizations": {
+    "vscode": { "extensions": ["redhat.ansible", "redhat.vscode-yaml"] }
+  },
+  "remoteUser": "root"
+}

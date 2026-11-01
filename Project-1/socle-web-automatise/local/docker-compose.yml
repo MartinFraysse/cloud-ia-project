@@ -1,0 +1,52 @@
+# Rôle : banc local = 1 controller (Ansible) + 2 nœuds Debian 12 / systemd gérés en SSH.
+# Reprise du docker-compose des labs. Les chemins sont relatifs à ce fichier (dossier local/).
+# Les options privileged / cgroup / volumes / tmpfs permettent à systemd de tourner en PID 1.
+
+services:
+  controller:
+    build:
+      context: ./controller
+    volumes:
+      - ..:/workspace:cached   # racine du dépôt montée dans le controller
+    command: sleep infinity    # garde le conteneur vivant pour VS Code
+    networks:
+      - labnet
+    depends_on:
+      - node1
+      - node2
+
+  node1:
+    build:
+      context: ./node
+    hostname: node1
+    privileged: true           # systemd doit gérer les cgroups et monter des FS (banc local uniquement)
+    cgroup: host               # partage les cgroups (v2) de l'hôte, exigé par systemd
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:                     # systemd veut /run et /run/lock en mémoire, vides à chaque démarrage
+      - /run
+      - /run/lock
+    ports:
+      - "8081:80"              # page Fleet Info de node1 : http://localhost:8081
+    networks:
+      - labnet
+
+  node2:
+    build:
+      context: ./node
+    hostname: node2
+    privileged: true
+    cgroup: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /run/lock
+    ports:
+      - "8082:80"              # page Fleet Info de node2 : http://localhost:8082
+    networks:
+      - labnet
+
+networks:
+  labnet:
+    driver: bridge
