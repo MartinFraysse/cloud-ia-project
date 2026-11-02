@@ -1,0 +1,21 @@
+# Expose le frontend. En local : LoadBalancer + "minikube tunnel".
+# Sur GKE : ClusterIP (test via port-forward) puis LoadBalancer (IP publique).
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  labels:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: livre-or-cloud
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: frontend
+  ports:
+    - name: http
+      port: 80             # port exposé par le Service
+      targetPort: http     # renvoie vers le port nommé du conteneur

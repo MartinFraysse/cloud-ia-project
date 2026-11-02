@@ -15,6 +15,11 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 | 08 | `08-messages-avant-suppression.png` | 02-voir-le-bug | Le livre d'or avec 3 messages, avant la suppression du pod leader |
 | 09 | `09-suppression-pod-leader.png` | 02-voir-le-bug | Suppression du pod `redis-leader` |
 | 10 | `10-messages-perdus.png` | 02-voir-le-bug | Après redémarrage du leader : **tous les messages ont disparu** |
+| 11 | `11-creation-fichiers-manifestes.png` | 03-fichiers-propres | Création des 9 fichiers de manifestes (vides) dans `k8s/` |
+| 12 | `12-apply-manifestes-dev.png` | 03-fichiers-propres | Installation de nos manifestes dans le namespace `dev` |
+| 13 | `13-etat-manifestes-dev.png` | 03-fichiers-propres | `kubectl get all,cm -n dev` : 5 pods Running, 3 Services, 2 ConfigMaps |
+| 14 | `14-endpoints-dev.png` | 03-fichiers-propres | Endpoints non vides : chaque Service trouve ses pods |
+| 15 | `15-application-dev-fonctionnelle.png` | 03-fichiers-propres | L'application déployée avec nos manifestes fonctionne (3 messages) |
 
 ---
 
@@ -199,3 +204,106 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 - **Commentaire :** c'est **exactement le problème du client** (Cloud Hôtels). Captures 08 → 09
   → 10 = preuve « avant / action / après » pour la partie 2 de la doc. Corrigé en partie 4
   (disque persistant + configuration Redis).
+
+---
+
+## 11 — Création des fichiers de manifestes
+
+- **Fichier :** `11-creation-fichiers-manifestes.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-manifestes-kubernetes`
+- **Dossier :** `Project-2/k8s/`
+- **Commande :** `touch namespaces.yaml frontend-configmap.yaml redis-follower-configmap.yaml frontend-deployment.yaml frontend-service.yaml redis-follower-deployment.yaml redis-follower-service.yaml redis-leader-deployment.yaml redis-leader-service.yaml`
+- **Résultat :** 9 fichiers vides (0 octet), à côté du dossier `tutoriel-origine/`.
+
+  | Brique | Fichiers |
+  |---|---|
+  | Environnements | `namespaces.yaml` |
+  | frontend | `frontend-configmap.yaml`, `frontend-deployment.yaml`, `frontend-service.yaml` |
+  | redis-follower | `redis-follower-configmap.yaml`, `redis-follower-deployment.yaml`, `redis-follower-service.yaml` |
+  | redis-leader | `redis-leader-deployment.yaml`, `redis-leader-service.yaml` |
+
+- **Commentaire :** un fichier par objet Kubernetes, nommé `<brique>-<type>.yaml` (même
+  convention que les templates Helm de la partie 5). Les fichiers de persistance du leader
+  (`redis-leader-configmap.yaml`, `redis-leader-pvc.yaml`) sont ajoutés en partie 4.
+
+---
+
+## 12 — Installation de nos manifestes dans `dev`
+
+- **Fichier :** `12-apply-manifestes-dev.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-manifestes-kubernetes`
+- **Commandes :**
+  1. `kubectl config current-context` → `minikube`
+  2. `kubectl apply -f k8s/namespaces.yaml` → `dev`, `staging`, `prod` **unchanged**
+  3. `kubectl apply -n dev -f k8s/`
+- **Résultat :** 2 ConfigMaps, 3 Deployments et 3 Services **created** dans `dev`.
+- **À noter :**
+  - `unchanged` : les namespaces existaient déjà (créés lors d'un essai précédent). `kubectl
+    apply` ne refait rien quand l'objet est déjà conforme : c'est l'**idempotence**.
+  - Le 2e `apply` relit `namespaces.yaml` (il est dans le dossier) : sans effet, `unchanged`.
+  - Le sous-dossier `tutoriel-origine/` n'est **pas** lu (`-f` sur un dossier n'est pas récursif).
+
+---
+
+## 13 — État de l'application dans `dev`
+
+- **Fichier :** `13-etat-manifestes-dev.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-manifestes-kubernetes`
+- **Commande :** `kubectl get all,cm -n dev`
+- **Ce qu'on voit :**
+  - **5 pods** `Running`, `READY 1/1`, 0 redémarrage : 2 `frontend`, 2 `redis-follower`,
+    1 `redis-leader`. `1/1` = la **readiness probe** est validée.
+  - **3 Services** : `frontend` en `LoadBalancer` (`EXTERNAL-IP <pending>` tant que `minikube
+    tunnel` n'est pas lancé) ; `redis-follower` et `redis-leader` en `ClusterIP`, port 6379.
+  - **3 Deployments** : 2/2, 2/2, 1/1.
+  - **ConfigMaps** : `frontend-config` (3 réglages), `redis-follower-config` (2 réglages).
+    `kube-root-ca.crt` est créée automatiquement par Kubernetes dans chaque namespace (certificat
+    du cluster), ce n'est pas la nôtre.
+- **Différence avec le tutoriel (capture 05) :** 2 frontends au lieu de 3, réglages dans des
+  ConfigMaps, contrôles de santé actifs.
+
+---
+
+## 14 — Endpoints : chaque Service trouve ses pods
+
+- **Fichier :** `14-endpoints-dev.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-manifestes-kubernetes`
+- **Commande :** `kubectl get endpoints -n dev`
+- **Ce qu'on voit :**
+
+  | Service | Endpoints (IP des pods : port) |
+  |---|---|
+  | `frontend` | `10.244.0.10:80`, `10.244.0.11:80` → les 2 pods du site |
+  | `redis-follower` | `10.244.0.12:6379`, `10.244.0.13:6379` → les 2 copies |
+  | `redis-leader` | `10.244.0.14:6379` → la base principale |
+
+- **À retenir :** aucune ligne vide (`<none>`) → les **sélecteurs** des Services correspondent
+  bien aux **étiquettes** des pods (vérification demandée par l'énoncé, K5). Le frontend ne
+  pointe que vers ses pods, le leader et les copies sont bien séparés (correction du sélecteur
+  commun `app: redis` du tutoriel).
+- **Avertissement :** `v1 Endpoints is deprecated in v1.33+` → l'objet `Endpoints` est remplacé
+  par `EndpointSlice`. Sans impact ; commande équivalente : `kubectl get endpointslices -n dev`.
+
+---
+
+## 15 — L'application fonctionne avec nos manifestes (`dev`)
+
+- **Fichier :** `15-application-dev-fonctionnelle.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-manifestes-kubernetes`
+- **Accès :** `minikube tunnel` + `kubectl get svc frontend -n dev` → `http://<EXTERNAL-IP>`
+- **Ce qu'on voit :** 3 messages enregistrés et affichés : « Bonjour », « Martin », « Enchanté ».
+- **Ce que ça prouve :**
+  - Le site **écrit** sur `redis-leader` et **lit** sur `redis-follower` grâce aux adresses de la
+    ConfigMap `frontend-config` (`GET_HOSTS_FROM=env` + `REDIS_*_SERVICE_HOST`).
+  - Les copies se synchronisent sur le leader grâce à la ConfigMap `redis-follower-config`.
+  - Nos manifestes réécrits (étiquettes, probes, limites, ConfigMaps) fonctionnent comme le
+    tutoriel.
+- **Remarque :** des messages de test erronés ont été supprimés avant la capture avec
+  `kubectl exec -n dev deploy/redis-leader -- redis-cli DEL guestbook` (tous les messages sont
+  stockés dans une seule clé Redis, `guestbook`).
+- **Limite restante :** toujours **pas de persistance** → corrigé en partie 4.

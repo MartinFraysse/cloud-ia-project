@@ -1,0 +1,50 @@
+# Redis principal : reçoit toutes les ÉCRITURES. 1 seul réplica (un seul leader).
+# La persistance (PVC + redis.conf + stratégie Recreate) est ajoutée à l'étape suivante.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-leader
+  labels:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: redis-leader
+    app.kubernetes.io/part-of: livre-or-cloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: guestbook
+      app.kubernetes.io/instance: guestbook
+      app.kubernetes.io/component: redis-leader
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: guestbook
+        app.kubernetes.io/instance: guestbook
+        app.kubernetes.io/component: redis-leader
+        app.kubernetes.io/part-of: livre-or-cloud
+    spec:
+      containers:
+        - name: leader
+          image: docker.io/redis:6.0.5
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "redis-cli ping | grep -q PONG"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "redis-cli ping | grep -q PONG"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

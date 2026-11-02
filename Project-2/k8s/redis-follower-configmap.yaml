@@ -1,0 +1,14 @@
+# Configuration des followers : le script run.sh de l'image lit REDIS_LEADER_SERVICE_HOST
+# (mode env) pour savoir de quel leader se répliquer.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-follower-config
+  labels:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: redis-follower
+    app.kubernetes.io/part-of: livre-or-cloud
+data:
+  GET_HOSTS_FROM: "env"
+  REDIS_LEADER_SERVICE_HOST: "redis-leader"

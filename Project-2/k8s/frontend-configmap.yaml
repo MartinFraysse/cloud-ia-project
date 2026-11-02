@@ -1,0 +1,16 @@
+# Configuration du frontend PHP, injectée en variables d'environnement (envFrom).
+# GET_HOSTS_FROM=env : le code PHP lit les deux variables ci-dessous pour trouver Redis.
+# On les fournit nous-mêmes, avec le nom des Services : les noms de Services restent libres.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  labels:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: livre-or-cloud
+data:
+  GET_HOSTS_FROM: "env"
+  REDIS_LEADER_SERVICE_HOST: "redis-leader"       # écritures → Service du leader
+  REDIS_FOLLOWER_SERVICE_HOST: "redis-follower"   # lectures  → Service des followers
