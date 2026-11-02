@@ -1,0 +1,55 @@
+# Frontend du livre d'or : le site web PHP. Il écrit les messages sur redis-leader
+# et les lit sur redis-follower (adresses dans la ConfigMap frontend-config).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: livre-or-cloud
+spec:
+  replicas: 2
+  selector:
+    matchLabels:           # labels STABLES uniquement (le sélecteur est immuable)
+      app.kubernetes.io/name: guestbook
+      app.kubernetes.io/instance: guestbook
+      app.kubernetes.io/component: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: guestbook
+        app.kubernetes.io/instance: guestbook
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: livre-or-cloud
+    spec:
+      containers:
+        - name: php-redis
+          image: us-docker.pkg.dev/google-samples/containers/gke/gb-frontend:v5
+          imagePullPolicy: IfNotPresent   # tag figé → inutile de re-télécharger
+          envFrom:
+            - configMapRef:
+                name: frontend-config      # réglages : où écrire, où lire
+          ports:
+            - name: http                  # port nommé : les probes et le Service s'y réfèrent
+              containerPort: 80
+          readinessProbe:                 # retire le pod du Service tant qu'Apache ne répond pas
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5        # Apache démarre en ~2 s
+            periodSeconds: 10
+          livenessProbe:                  # redémarre Apache s'il est figé
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15       # laisser le temps de démarrer avant de juger
+            periodSeconds: 20
+          resources:
+            requests:                     # valeurs du tutoriel, suffisantes pour Apache au repos
+              cpu: 100m
+              memory: 128Mi
+            limits:                       # marge x2,5 pour absorber les pics
+              cpu: 250m
+              memory: 256Mi

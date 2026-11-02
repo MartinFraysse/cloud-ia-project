@@ -1,0 +1,21 @@
+# Service interne des followers : cible des LECTURES du frontend.
+# Son nom doit correspondre à REDIS_FOLLOWER_SERVICE_HOST dans la ConfigMap frontend.
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-follower
+  labels:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: redis-follower
+    app.kubernetes.io/part-of: livre-or-cloud
+spec:
+  type: ClusterIP            # jamais exposé hors du cluster
+  selector:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: redis-follower
+  ports:
+    - name: redis
+      port: 6379             # imposé : le PHP et run.sh se connectent sur 6379 en dur
+      targetPort: redis

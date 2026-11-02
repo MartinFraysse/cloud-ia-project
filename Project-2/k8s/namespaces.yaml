@@ -1,0 +1,23 @@
+# Namespaces des trois environnements. Chacun contient une instance complète et
+# indépendante de Guestbook : un message saisi en dev n'apparaît pas en prod.
+# Le label "environment" permet de filtrer : kubectl get ns -l environment
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+  labels:
+    environment: dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: staging
+  labels:
+    environment: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod
+  labels:
+    environment: prod
