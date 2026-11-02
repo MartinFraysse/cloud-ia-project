@@ -136,8 +136,8 @@ Le statut `Ready` signifie que le cluster est prêt.
 - [x] Le cluster local minikube est démarré.
 - [x] `kubectl get nodes` affiche `Ready`.
 
-➡️ **Suite :** Partie 2 — Constater le problème *(à venir)*.
+➡️ **Suite :** [Partie 2 — Constater le problème](02-constater-le-probleme.md).
 
 ---
 
-[⬅️ Introduction](00-introduction.md) · [🏠 Sommaire](README.md)
+[⬅️ Introduction](00-introduction.md) · [🏠 Sommaire](README.md) · [Partie 2 — Constater le problème ➡️](02-constater-le-probleme.md)
