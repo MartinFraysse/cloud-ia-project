@@ -1,0 +1,21 @@
+# Service interne du leader : cible des ÉCRITURES du frontend et de la réplication
+# des followers. Son nom doit correspondre à REDIS_LEADER_SERVICE_HOST dans les ConfigMaps.
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-leader
+  labels:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: redis-leader
+    app.kubernetes.io/part-of: livre-or-cloud
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: redis-leader
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
