@@ -11,7 +11,7 @@ La documentation est découpée **en un fichier par partie**. Lire dans l'ordre 
 |---|---|---|---|
 | 0 | [Introduction](00-introduction.md) | Le projet, ses objectifs, ce qui est automatisé | ✅ |
 | 1 | [Préparer le poste de travail](01-preparation-poste.md) | Outils, versions, cluster local | ✅ |
-| 2 | Constater le problème | L'application d'origine et la perte des messages | ⏳ à venir |
+| 2 | [Constater le problème](02-constater-le-probleme.md) | L'application d'origine et la perte des messages | ✅ |
 | 3 | Les manifestes Kubernetes | Les objets de l'application | ⏳ à venir |
 | 4 | La persistance des données | Ne plus perdre de messages | ⏳ à venir |
 | 5 | Le chart Helm | Une seule recette pour tous les environnements | ⏳ à venir |
