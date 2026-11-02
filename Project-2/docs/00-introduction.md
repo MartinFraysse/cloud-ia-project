@@ -18,10 +18,19 @@ Elle a **3 composants** :
 
 ```mermaid
 flowchart LR
-    C([👤 Client]) --> F["🖥️ frontend<br/>site web PHP"]
-    F -->|écrit| L["📕 redis-leader<br/>base principale"]
-    F -->|lit| R["📗 redis-follower<br/>copies de la base"]
-    L -->|recopie| R
+    C(["👤 Client"]) ==> F["🖥️ <b>frontend</b><br/>site web PHP"]
+    F ==>|"① écrit"| L["📕 <b>redis-leader</b><br/>base principale"]
+    F ==>|"② lit"| R["📗 <b>redis-follower</b><br/>copies de la base"]
+    L ==>|"③ recopie"| R
+
+    classDef user fill:#374151,stroke:#d1d5db,color:#fff
+    classDef fe fill:#6d28d9,stroke:#c4b5fd,color:#fff
+    classDef leader fill:#b91c1c,stroke:#fca5a5,color:#fff
+    classDef follower fill:#15803d,stroke:#86efac,color:#fff
+    class C user
+    class F fe
+    class L leader
+    class R follower
 ```
 
 | Composant | Rôle |
@@ -56,19 +65,26 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    G[("📦 Dépôt Git")]
+    G[("📦 <b>Dépôt Git</b>")]
 
-    subgraph LOCAL["💻 En local (poste de travail)"]
-        MK["Cluster minikube"]
+    subgraph LOCAL["💻 EN LOCAL (poste de travail)"]
+        MK[["☸️ Cluster <b>minikube</b>"]]
     end
 
-    subgraph CLOUD["☁️ Dans Google Cloud"]
-        TF["Terraform"] -->|crée| GKE["Cluster GKE"]
+    subgraph CLOUD["☁️ DANS GOOGLE CLOUD"]
+        TF["🏗️ <b>Terraform</b>"] ==>|crée| GKE[["☸️ Cluster <b>GKE</b>"]]
     end
 
-    G -->|même chart Helm| MK
-    G --> TF
-    G -->|même chart Helm| GKE
+    G ==>|"⎈ même chart Helm"| MK
+    G ==> TF
+    G ==>|"⎈ même chart Helm"| GKE
+
+    classDef git fill:#374151,stroke:#d1d5db,color:#fff
+    classDef tf fill:#be185d,stroke:#f9a8d4,color:#fff
+    classDef cluster fill:#1d4ed8,stroke:#93c5fd,color:#fff
+    class G git
+    class TF tf
+    class MK,GKE cluster
 ```
 
 Dans chaque cluster, on installe l'application **3 fois**, une par environnement :

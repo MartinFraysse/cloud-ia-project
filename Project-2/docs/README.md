@@ -12,7 +12,7 @@ La documentation est découpée **en un fichier par partie**. Lire dans l'ordre 
 | 0 | [Introduction](00-introduction.md) | Le projet, ses objectifs, ce qui est automatisé | ✅ |
 | 1 | [Préparer le poste de travail](01-preparation-poste.md) | Outils, versions, cluster local | ✅ |
 | 2 | [Constater le problème](02-constater-le-probleme.md) | L'application d'origine et la perte des messages | ✅ |
-| 3 | Les manifestes Kubernetes | Les objets de l'application | ⏳ à venir |
+| 3 | [Les manifestes Kubernetes](03-manifestes-kubernetes.md) | Les objets de l'application | ✅ |
 | 4 | La persistance des données | Ne plus perdre de messages | ⏳ à venir |
 | 5 | Le chart Helm | Une seule recette pour tous les environnements | ⏳ à venir |
 | 6 | Les environnements dev / staging / prod | Installation, mise à jour, retour arrière | ⏳ à venir |
@@ -25,6 +25,24 @@ La documentation est découpée **en un fichier par partie**. Lire dans l'ordre 
 > **Terraform crée le cluster Kubernetes dans Google Cloud. Helm y installe l'application
 > Guestbook en 3 environnements (`dev`, `staging`, `prod`). Le même chart fonctionne en local
 > sur minikube.**
+
+## Code couleur des schémas
+
+Les schémas de la documentation utilisent toujours les mêmes couleurs.
+
+| Couleur | Signification |
+|---|---|
+| 🟪 violet | Le **site web** (`frontend`) |
+| 🟥 rouge | La **base principale** (`redis-leader`) |
+| 🟩 vert | Les **copies** de la base (`redis-follower`) |
+| 🔷 cyan | Un **Service** (adresse fixe) |
+| 🟦 bleu | Un **Deployment**, un ReplicaSet ou un **cluster** |
+| 🟨 jaune | Une **ConfigMap** (réglages) |
+| ⬜ blanc | Un **pod** |
+| 🩷 rose | **Terraform** |
+| ⬛ gris | Une personne, un outil en ligne de commande, le poste ou le dépôt Git |
+
+Flèche **épaisse** = flux principal · flèche **pointillée** = réglage ou connexion.
 
 ## Autres ressources
 

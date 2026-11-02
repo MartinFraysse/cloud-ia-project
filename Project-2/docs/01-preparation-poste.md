@@ -19,12 +19,24 @@ Ce cluster local permet de tout tester **gratuitement**, avant d'aller dans le c
 
 ```mermaid
 flowchart LR
-    P([💻 Poste de travail])
-    P --> K[kubectl] --> C1[["Cluster local<br/>minikube"]]
-    P --> H[Helm] --> K
-    P --> T[Terraform] --> C2[["Cluster Google<br/>GKE"]]
-    P --> G[gcloud + plugin] --> C2
-    K --> C2
+    P(["💻 <b>Poste de travail</b>"])
+    P ==> H["⎈ <b>Helm</b>"] ==> K["⌨️ <b>kubectl</b>"]
+    P ==> K
+    P ==> T["🏗️ <b>Terraform</b>"]
+    P ==> G["☁️ <b>gcloud</b><br/>+ plugin GKE"]
+    K ==> C1[["☸️ Cluster local<br/><b>minikube</b>"]]
+    K ==> C2[["☸️ Cluster Google<br/><b>GKE</b>"]]
+    T ==>|crée| C2
+    G -.->|connexion| C2
+
+    classDef user fill:#374151,stroke:#d1d5db,color:#fff
+    classDef tool fill:#475569,stroke:#cbd5e1,color:#fff
+    classDef tf fill:#be185d,stroke:#f9a8d4,color:#fff
+    classDef cluster fill:#1d4ed8,stroke:#93c5fd,color:#fff
+    class P user
+    class H,K,G tool
+    class T tf
+    class C1,C2 cluster
 ```
 
 > Les commandes ci-dessous sont pour **Arch Linux**.

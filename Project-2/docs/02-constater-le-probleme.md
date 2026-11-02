@@ -87,9 +87,17 @@ kubectl get all -n tuto
 
 ```mermaid
 flowchart LR
-    D[Deployment] -->|crée| RS[ReplicaSet] -->|crée| P1((pod))
-    RS --> P2((pod))
-    RS --> P3((pod))
+    D["📦 <b>Deployment</b><br/>frontend"] ==>|crée| RS["📋 <b>ReplicaSet</b><br/>frontend-88dcd974c"]
+    RS ==>|crée| P1(("pod"))
+    RS ==> P2(("pod"))
+    RS ==> P3(("pod"))
+
+    classDef dep fill:#1d4ed8,stroke:#93c5fd,color:#fff
+    classDef rs fill:#4338ca,stroke:#a5b4fc,color:#fff
+    classDef pod fill:#f8fafc,stroke:#64748b,color:#0f172a
+    class D dep
+    class RS rs
+    class P1,P2,P3 pod
 ```
 
 Le Deployment crée un ReplicaSet, qui crée les pods. D'où les noms en plusieurs morceaux :
@@ -139,10 +147,19 @@ Ouvrir **http://10.105.199.2** dans le navigateur, puis écrire quelques message
 
 ```mermaid
 flowchart LR
-    N([🌐 Navigateur]) --> F["🖥️ frontend"]
-    F -->|écrit le message| L["📕 redis-leader"]
-    L -->|recopie| R["📗 redis-follower"]
-    F -->|lit les messages| R
+    N(["🌐 Navigateur"]) ==> F["🖥️ <b>frontend</b>"]
+    F ==>|"① écrit le message"| L["📕 <b>redis-leader</b>"]
+    L ==>|"② recopie"| R["📗 <b>redis-follower</b>"]
+    F ==>|"③ lit les messages"| R
+
+    classDef user fill:#374151,stroke:#d1d5db,color:#fff
+    classDef fe fill:#6d28d9,stroke:#c4b5fd,color:#fff
+    classDef leader fill:#b91c1c,stroke:#fca5a5,color:#fff
+    classDef follower fill:#15803d,stroke:#86efac,color:#fff
+    class N user
+    class F fe
+    class L leader
+    class R follower
 ```
 
 ---
@@ -181,13 +198,15 @@ C'est **exactement** le problème rencontré par le client.
 
 ```mermaid
 sequenceDiagram
-    participant L as redis-leader
-    participant R as redis-follower
+    participant L as 📕 redis-leader
+    participant R as 📗 redis-follower
     Note over L,R: Les 3 messages sont en mémoire
+    rect rgba(220, 38, 38, 0.18)
     Note over L: 💥 pod supprimé
     Note over L: Nouveau pod = base VIDE<br/>(rien sur disque)
     R->>L: « je me resynchronise »
     L-->>R: copie complète… du vide
+    end
     Note over L,R: Plus aucun message nulle part
 ```
 
@@ -333,8 +352,8 @@ Supprime le namespace **et tout ce qu'il contient**. Fermer ensuite le terminal 
 - [x] La cause est identifiée : Redis ne garde ses données qu'en mémoire.
 - [x] La liste des corrections à apporter est établie.
 
-➡️ **Suite :** Partie 3 — Les manifestes Kubernetes *(à venir)*.
+➡️ **Suite :** [Partie 3 — Les manifestes Kubernetes](03-manifestes-kubernetes.md).
 
 ---
 
-[⬅️ Partie 1 — Préparer le poste](01-preparation-poste.md) · [🏠 Sommaire](README.md)
+[⬅️ Partie 1 — Préparer le poste](01-preparation-poste.md) · [🏠 Sommaire](README.md) · [Partie 3 — Les manifestes Kubernetes ➡️](03-manifestes-kubernetes.md)
