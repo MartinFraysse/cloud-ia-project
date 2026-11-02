@@ -8,6 +8,13 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 | 01 | `01-installation-outils-pacman.png` | 01-preparer | Installation des outils |
 | 02 | `02-installation-gcloud-yay.png` | 01-preparer | Installation de gcloud + plugin GKE (AUR) |
 | 03 | `03-demarrage-minikube.png` | 01-preparer | Démarrage du cluster local minikube, nœud Ready |
+| 04 | `04-deploiement-tutoriel-origine.png` | 02-voir-le-bug | Déploiement de l'application d'origine dans le namespace `tuto` |
+| 05 | `05-etat-application-origine.png` | 02-voir-le-bug | `kubectl get all -n tuto` : 6 pods Running, Services, Deployments, ReplicaSets |
+| 06 | `06-minikube-tunnel.png` | 02-voir-le-bug | `minikube tunnel` actif : accès au Service LoadBalancer `frontend` |
+| 07 | `07-ip-externe-frontend.png` | 02-voir-le-bug | Le Service `frontend` reçoit son `EXTERNAL-IP` grâce au tunnel |
+| 08 | `08-messages-avant-suppression.png` | 02-voir-le-bug | Le livre d'or avec 3 messages, avant la suppression du pod leader |
+| 09 | `09-suppression-pod-leader.png` | 02-voir-le-bug | Suppression du pod `redis-leader` |
+| 10 | `10-messages-perdus.png` | 02-voir-le-bug | Après redémarrage du leader : **tous les messages ont disparu** |
 
 ---
 
@@ -66,3 +73,129 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
     Sans impact pour les commandes de base ; sinon utiliser `minikube kubectl -- <commande>`.
 - **Commentaire :** preuve que l'environnement local fonctionne (section « Prérequis » et
   « Déploiement local » de la doc). À noter dans les versions testées : Kubernetes 1.35.1.
+
+---
+
+## 04 — Déploiement de l'application d'origine (namespace `tuto`)
+
+- **Fichier :** `04-deploiement-tutoriel-origine.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-decouverte-guestbook`
+- **Commandes :**
+  1. `kubectl config current-context` → `minikube` (vérifier qu'on est sur le cluster local)
+  2. `kubectl create namespace tuto` → `namespace/tuto created`
+  3. `kubectl apply -n tuto -f Project-2/k8s/tutoriel-origine/`
+- **Objets créés (6) :**
+  - Deployments : `frontend`, `redis-follower`, `redis-leader`
+  - Services : `frontend`, `redis-follower`, `redis-leader`
+- **Commentaire :** on installe les manifestes du tutoriel **sans modification**, dans un
+  namespace isolé (`tuto`), pour reproduire le problème du client (perte des messages). Le
+  `README.md` du dossier est ignoré par kubectl (seuls les `.yaml` sont lus). Utile pour la
+  partie 2 de la doc (« Constater le problème »).
+
+---
+
+## 05 — État de l'application d'origine (`kubectl get all -n tuto`)
+
+- **Fichier :** `05-etat-application-origine.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-decouverte-guestbook`
+- **Commande :** `kubectl get all -n tuto`
+- **Ce qu'on voit :**
+  - **6 pods** `Running`, `READY 1/1`, 0 redémarrage : 3 `frontend`, 2 `redis-follower`, 1 `redis-leader`.
+  - **3 Services** :
+    - `frontend` : `LoadBalancer`, port `80:30205/TCP`, `EXTERNAL-IP <pending>` → normal tant que
+      `minikube tunnel` n'est pas lancé.
+    - `redis-follower` et `redis-leader` : `ClusterIP`, port `6379` → accessibles seulement
+      depuis l'intérieur du cluster.
+  - **3 Deployments** (3/3, 2/2, 1/1) et les **ReplicaSets** qu'ils ont créés.
+- **À retenir :** chaîne de création `Deployment → ReplicaSet → Pods`. Le suffixe des noms
+  (ex. `frontend-88dcd974c-b4hsx`) = identifiant du ReplicaSet + identifiant aléatoire du pod.
+- **Commentaire :** l'application d'origine tourne correctement. Prochaine étape : y accéder via
+  `minikube tunnel`, puis supprimer le pod `redis-leader` pour constater la perte des messages.
+
+---
+
+## 06 — `minikube tunnel` actif
+
+- **Fichier :** `06-minikube-tunnel.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-decouverte-guestbook`
+- **Commande :** `minikube tunnel` (dans un terminal dédié, laissé ouvert)
+- **Ce qu'on voit :**
+  - Demande du mot de passe `sudo` : nécessaire pour créer la route réseau et ouvrir le port 80.
+  - `route: 10.96.0.0/12 -> 192.168.49.2` : le réseau des Services du cluster (`10.96.0.0/12`)
+    est rendu joignable depuis le poste, via le nœud minikube (`192.168.49.2`).
+  - `services: [frontend]` : le seul Service `LoadBalancer` détecté, celui du site web.
+  - `minikube`, `router`, `loadbalancer emulator` : **no errors**.
+- **Commentaire :** `minikube tunnel` simule le load balancer d'un cloud : il donne une
+  `EXTERNAL-IP` aux Services `LoadBalancer` (sous Linux : l'IP du Service dans le cluster, ex.
+  `10.105.199.2` ; sous macOS / Windows : `127.0.0.1`). Il doit rester
+  ouvert pendant toute l'utilisation. Utile pour la partie 2 (accès à l'application) et pour
+  l'environnement local des parties suivantes.
+
+---
+
+## 07 — Adresse externe du site (`EXTERNAL-IP`)
+
+- **Fichier :** `07-ip-externe-frontend.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-decouverte-guestbook`
+- **Commande :** `kubectl get svc frontend -n tuto` (avec `minikube tunnel` ouvert)
+- **Ce qu'on voit :**
+  - `TYPE LoadBalancer`, `CLUSTER-IP 10.105.199.2`, **`EXTERNAL-IP 10.105.199.2`**
+    (avant le tunnel : `<pending>`, voir capture 05).
+  - `PORT(S) 80:30205/TCP` : port 80 du Service, `30205` = port ouvert sur le nœud (NodePort,
+    créé automatiquement pour un LoadBalancer).
+- **Point important :** sous **Linux**, `minikube tunnel` donne au Service **sa propre IP de
+  cluster** comme adresse externe, joignable grâce à la route `10.96.0.0/12 -> 192.168.49.2`
+  (capture 06). Sous **macOS / Windows** (Docker Desktop), l'adresse serait `127.0.0.1`.
+- **Accès :** http://10.105.199.2
+- **Commentaire :** preuve que l'application d'origine est accessible depuis le poste. Utile
+  pour la partie 2 de la doc et pour la section « Dépannage » (adresse différente selon l'OS).
+
+---
+
+## 08 — Le livre d'or avec des messages (avant le test)
+
+- **Fichier :** `08-messages-avant-suppression.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-decouverte-guestbook`
+- **Accès :** http://10.105.199.2 (adresse obtenue en capture 07)
+- **Ce qu'on voit :** l'application Guestbook fonctionne. 3 messages ont été saisis :
+  « Bonjour », « Je m'appelle », « Martin ».
+- **Ce qui se passe derrière :** chaque envoi est **écrit** sur `redis-leader` ; l'affichage
+  **lit** les messages sur `redis-follower`, qui a recopié le leader.
+- **Commentaire :** état « avant » du test de perte de données. Prochaine action : supprimer
+  le pod `redis-leader`, puis recharger la page.
+
+---
+
+## 09 — Suppression du pod `redis-leader`
+
+- **Fichier :** `09-suppression-pod-leader.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-decouverte-guestbook`
+- **Commande :** `kubectl delete pod -n tuto -l role=leader`
+- **Résultat :** `pod "redis-leader-869887855b-rp4xr" deleted from tuto namespace`
+- **Explication :** `-l role=leader` sélectionne le pod par son **étiquette** (label) au lieu de
+  son nom complet. Le Deployment `redis-leader` détecte qu'il manque un pod et en **recrée un
+  neuf** automatiquement. Cette action simule un redémarrage, une panne ou une mise à jour.
+
+---
+
+## 10 — Les messages ont disparu 💥
+
+- **Fichier :** `10-messages-perdus.png`
+- **Date :** 2026-11-02
+- **Branche :** `feat/p2-decouverte-guestbook`
+- **Action :** rechargement de http://10.105.199.2 une fois le nouveau pod `redis-leader` démarré.
+- **Résultat :** la page est **vide**. Les 3 messages de la capture 08 sont perdus.
+- **Pourquoi :**
+  1. Redis garde les messages **en mémoire uniquement** (aucun disque, aucune persistance).
+  2. Le nouveau pod `redis-leader` démarre donc **vide**.
+  3. Les `redis-follower` se resynchronisent sur ce nouveau leader vide et **perdent aussi**
+     leurs copies.
+- **Commentaire :** c'est **exactement le problème du client** (Cloud Hôtels). Captures 08 → 09
+  → 10 = preuve « avant / action / après » pour la partie 2 de la doc. Corrigé en partie 4
+  (disque persistant + configuration Redis).
