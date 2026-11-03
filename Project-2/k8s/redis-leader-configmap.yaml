@@ -1,0 +1,19 @@
+# Configuration Redis du leader (fichier redis.conf), montée dans /etc/redis.
+# Objectif : persister les messages sur le volume /data (exigence n°1 du client).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-leader-config
+  labels:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: redis-leader
+    app.kubernetes.io/part-of: livre-or-cloud
+data:
+  redis.conf: |
+    # Le reste (port 6379, écoute sur toutes les interfaces...) est déjà le défaut de l'image.
+    # Dossier où Redis écrit ses fichiers = le disque persistant (PVC monté sur /data)
+    dir /data
+    # Mode AOF : chaque écriture est ajoutée au journal appendonly.aof,
+    # enregistré sur disque toutes les secondes -> au pire 1 s de messages perdue
+    appendonly yes

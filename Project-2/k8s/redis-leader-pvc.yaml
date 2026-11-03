@@ -1,0 +1,19 @@
+# Volume persistant du leader, monté sur /data. Survit à la suppression du pod.
+# storageClassName est volontairement ABSENT : la StorageClass par défaut du cluster est
+# utilisée (standard sur minikube, standard-rwo sur GKE). Écrire storageClassName: ""
+# signifierait "aucune classe" et le PVC resterait Pending.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-leader-data
+  labels:
+    app.kubernetes.io/name: guestbook
+    app.kubernetes.io/instance: guestbook
+    app.kubernetes.io/component: redis-leader
+    app.kubernetes.io/part-of: livre-or-cloud
+spec:
+  accessModes:
+    - ReadWriteOnce        # un seul nœud à la fois : suffit, il n'y a qu'un leader
+  resources:
+    requests:
+      storage: 1Gi         # quelques Mo de messages : 1 Gi laisse une très large marge
