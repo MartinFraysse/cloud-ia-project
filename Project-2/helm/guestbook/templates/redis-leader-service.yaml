@@ -1,0 +1,19 @@
+{{/*
+Service interne du Redis leader (ClusterIP, jamais exposé hors du cluster) : cible des
+écritures du frontend et de la réplication des followers.
+Son nom (guestbook.redisLeader.serviceName) est repris dans les ConfigMaps frontend et follower.
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "guestbook.redisLeader.serviceName" . }}
+  labels:
+    {{- include "guestbook.componentLabels" (dict "ctx" . "component" "redis-leader") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "guestbook.componentSelectorLabels" (dict "ctx" . "component" "redis-leader") | nindent 4 }}
+  ports:
+    - name: redis
+      port: {{ .Values.redisLeader.service.port }}
+      targetPort: redis

@@ -1,0 +1,19 @@
+{{/*
+Service interne des followers (ClusterIP, jamais exposé hors du cluster) : cible des
+lectures du frontend.
+Son nom (guestbook.redisFollower.serviceName) est repris dans la ConfigMap frontend.
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "guestbook.redisFollower.serviceName" . }}
+  labels:
+    {{- include "guestbook.componentLabels" (dict "ctx" . "component" "redis-follower") | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "guestbook.componentSelectorLabels" (dict "ctx" . "component" "redis-follower") | nindent 4 }}
+  ports:
+    - name: redis
+      port: {{ .Values.redisFollower.service.port }}
+      targetPort: redis

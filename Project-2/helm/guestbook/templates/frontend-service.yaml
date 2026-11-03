@@ -1,0 +1,18 @@
+{{/*
+Service du frontend. Type piloté par frontend.service.type :
+LoadBalancer en local (minikube tunnel) et sur GKE après validation, ClusterIP pour la phase de test cloud.
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "guestbook.frontend.serviceName" . }}
+  labels:
+    {{- include "guestbook.componentLabels" (dict "ctx" . "component" "frontend") | nindent 4 }}
+spec:
+  type: {{ .Values.frontend.service.type }}
+  selector:
+    {{- include "guestbook.componentSelectorLabels" (dict "ctx" . "component" "frontend") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.frontend.service.port }}
+      targetPort: http

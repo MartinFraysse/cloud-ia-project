@@ -1,0 +1,158 @@
+# Valeurs PAR DÉFAUT du chart guestbook (livre d'or : frontend PHP + Redis leader / followers).
+# Chaque environnement ne surcharge que ce qui change, dans values-<ENV>.yaml.
+# Priorité : --set  >  -f values-<ENV>.yaml  >  ce fichier.
+
+# ---------------------------------------------------------------------------
+# Noms et labels communs (utilisés par templates/_helpers.tpl)
+# ---------------------------------------------------------------------------
+
+# Remplace "guestbook" dans le nom des objets. Vide = nom du chart.
+nameOverride: ""
+# Remplace le nom complet "<release>-guestbook". Vide = calculé à partir de la release.
+fullnameOverride: ""
+# Valeur du label app.kubernetes.io/part-of, posé sur tous les objets.
+partOf: livre-or-cloud
+# Labels ajoutés à TOUS les objets (jamais aux sélecteurs). Format "clé: valeur".
+# Ex. dans values-<ENV>.yaml : environment: <ENV>
+commonLabels: {}
+
+# ---------------------------------------------------------------------------
+# Frontend : le site web PHP (sans état)
+# ---------------------------------------------------------------------------
+frontend:
+  # Nombre de pods du site. Sans état : peut être augmenté librement.
+  replicaCount: 1
+  image:
+    # Dépôt de l'image du site (exemple officiel Google).
+    repository: us-docker.pkg.dev/google-samples/containers/gke/gb-frontend
+    # Tag de l'image. Vide = appVersion de Chart.yaml (v5). Jamais "latest".
+    tag: ""
+    # IfNotPresent : le tag est figé, inutile de re-télécharger l'image à chaque démarrage.
+    pullPolicy: IfNotPresent
+  # Variables d'environnement du site, écrites dans sa ConfigMap (une ligne par variable).
+  # Les adresses Redis sont ajoutées automatiquement : ne pas les mettre ici.
+  env:
+    # "env" : le PHP lit les adresses Redis dans REDIS_LEADER_SERVICE_HOST et
+    # REDIS_FOLLOWER_SERVICE_HOST (au lieu de noms écrits en dur dans son code).
+    GET_HOSTS_FROM: env
+  service:
+    # Nom du Service. Vide = "<release>-guestbook-frontend".
+    name: ""
+    # LoadBalancer : accessible de l'extérieur (minikube tunnel en local, IP publique sur GKE).
+    # ClusterIP : interne, accès par kubectl port-forward (phase de test dans le cloud).
+    type: LoadBalancer
+    # Port exposé par le Service (différent par environnement pour éviter les conflits).
+    # Le conteneur, lui, écoute toujours sur 80 (Apache).
+    port: 80
+  # Readiness : retire le pod du Service tant qu'Apache ne répond pas sur "/".
+  # Durées en secondes. Non écrits : timeoutSeconds = 1, failureThreshold = 3 (défauts).
+  readinessProbe:
+    httpGet:
+      path: /
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  # Liveness : redémarre le conteneur s'il ne répond plus. Plus patiente que la readiness.
+  livenessProbe:
+    httpGet:
+      path: /
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  # Ressources du conteneur. cpu en millicœurs (100m = 0,1 CPU), mémoire en Mi.
+  # requests = réservé (sert à placer le pod) ; limits = plafond.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# ---------------------------------------------------------------------------
+# Redis leader : la base principale (reçoit les écritures, persistante)
+# ---------------------------------------------------------------------------
+redisLeader:
+  # DOIT rester 1 : un seul Redis peut écrire sur le disque ReadWriteOnce.
+  replicaCount: 1
+  image:
+    # Image Redis officielle.
+    repository: docker.io/redis
+    # Version de Redis (tag explicite, jamais "latest").
+    tag: "6.0.5"
+    # IfNotPresent : le tag est figé.
+    pullPolicy: IfNotPresent
+  service:
+    # Nom du Service. Vide = "<release>-guestbook-redis-leader". Repris dans les ConfigMaps.
+    name: ""
+    # DOIT rester 6379 : le port est écrit en dur dans les images frontend et follower.
+    port: 6379
+  # Readiness : Redis doit répondre PONG (pas seulement avoir le port ouvert).
+  readinessProbe:
+    exec:
+      command: ["sh", "-c", "redis-cli ping | grep -q PONG"]
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  # Liveness : redémarre Redis s'il ne répond plus.
+  livenessProbe:
+    exec:
+      command: ["sh", "-c", "redis-cli ping | grep -q PONG"]
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  # Ressources du conteneur (mêmes unités que le frontend).
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  # Disque persistant monté sur /data (PVC).
+  persistence:
+    # Taille du disque (ex. 1Gi, 5Gi). Peut être augmentée si la StorageClass le permet,
+    # jamais réduite.
+    size: 1Gi
+    # ReadWriteOnce : le disque se branche sur un seul nœud à la fois (un seul leader).
+    accessMode: ReadWriteOnce
+    # StorageClass. "" = champ omis = classe PAR DÉFAUT du cluster
+    # (standard sur minikube, standard-rwo sur GKE).
+    storageClass: ""
+
+# ---------------------------------------------------------------------------
+# Redis followers : les copies de la base (servent les lectures, sans disque)
+# ---------------------------------------------------------------------------
+redisFollower:
+  # Nombre de copies. Elles se recopient sur le leader au démarrage.
+  replicaCount: 1
+  image:
+    # Image follower de l'exemple Google (script run.sh de réplication).
+    repository: us-docker.pkg.dev/google-samples/containers/gke/gb-redis-follower
+    # Tag explicite, jamais "latest".
+    tag: v2
+    # IfNotPresent : le tag est figé.
+    pullPolicy: IfNotPresent
+  service:
+    # Nom du Service. Vide = "<release>-guestbook-redis-follower". Repris dans la ConfigMap frontend.
+    name: ""
+    # DOIT rester 6379 : le port est écrit en dur dans l'image frontend.
+    port: 6379
+  # Readiness : Redis doit répondre PONG.
+  readinessProbe:
+    exec:
+      command: ["sh", "-c", "redis-cli ping | grep -q PONG"]
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  # Liveness : redémarre le follower s'il ne répond plus.
+  livenessProbe:
+    exec:
+      command: ["sh", "-c", "redis-cli ping | grep -q PONG"]
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  # Ressources du conteneur (mêmes unités que le frontend).
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi

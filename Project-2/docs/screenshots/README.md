@@ -31,6 +31,7 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 | 24 | `24-redis-get-apres-recreate.png` | 04-reparer-le-bug | Après la mise à jour du leader : les 3 messages sont toujours là |
 | 25 | `25-redemarrage-minikube-pods.png` | 04-reparer-le-bug | Redémarrage complet de minikube : les 5 pods reviennent `1/1 Running` |
 | 26 | `26-redis-get-apres-redemarrage-minikube.png` | 04-reparer-le-bug | Après le redémarrage complet : les 3 messages sont toujours là |
+| 27 | `27-helm-lint-chart.png` | 05-recette-helm | `helm lint` du chart : 0 échec |
 
 ---
 
@@ -513,4 +514,19 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 - **Ce qu'on voit :** `,Premier test,Apres ajout,de la persistance`
 - **À retenir :** bonus de l'exigence K7 réussi : même après l'arrêt **de tout le cluster**, le
   disque persistant a été conservé et Redis a relu son journal AOF.
+
+---
+
+## 27 — `helm lint` du chart
+
+- **Fichier :** `27-helm-lint-chart.png`
+- **Date :** 2026-11-03
+- **Branche :** `feat/p2-chart-helm`
+- **Commande :** `helm lint helm/guestbook` (depuis `Project-2/`, Helm 4.3.0)
+- **Ce qu'on voit :** `1 chart(s) linted, 0 chart(s) failed`.
+- **À retenir :** le chart est valide (structure, `Chart.yaml`, templates rendus avec
+  `values.yaml`). Exigence H1.
+- **Remarque :** `[INFO] Chart.yaml: icon is recommended` est une simple suggestion (une icône
+  pour un catalogue de charts), sans conséquence. Le lint avec `-f values-<ENV>.yaml` sera fait
+  en partie 6, quand ces fichiers existeront.
 

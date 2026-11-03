@@ -1,0 +1,17 @@
+{{/*
+ConfigMap du Redis leader : le fichier redis.conf, monté dans /etc/redis.
+Identique pour tous les environnements : aucune valeur à paramétrer.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "guestbook.componentName" (dict "ctx" . "component" "redis-leader") }}
+  labels:
+    {{- include "guestbook.componentLabels" (dict "ctx" . "component" "redis-leader") | nindent 4 }}
+data:
+  redis.conf: |
+    # Dossier où Redis écrit ses fichiers = le disque persistant (PVC monté sur /data)
+    dir /data
+    # Mode AOF : chaque écriture est ajoutée au journal appendonly.aof,
+    # enregistré sur disque toutes les secondes -> au pire 1 s de messages perdue
+    appendonly yes
