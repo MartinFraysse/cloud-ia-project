@@ -1,0 +1,54 @@
+{{/*
+Deployment du Redis leader : reçoit toutes les écritures et les enregistre sur /data.
+Stratégie Recreate écrite en dur : le disque ReadWriteOnce ne se branche qu'à un seul Redis à
+la fois. C'est une contrainte technique, pas un choix d'environnement.
+checksum/config : recrée le pod quand redis.conf change, et seulement dans ce cas.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "guestbook.componentName" (dict "ctx" . "component" "redis-leader") }}
+  labels:
+    {{- include "guestbook.componentLabels" (dict "ctx" . "component" "redis-leader") | nindent 4 }}
+spec:
+  replicas: {{ .Values.redisLeader.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "guestbook.componentSelectorLabels" (dict "ctx" . "component" "redis-leader") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "guestbook.componentLabels" (dict "ctx" . "component" "redis-leader") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/redis-leader-configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: leader
+          image: "{{ .Values.redisLeader.image.repository }}:{{ .Values.redisLeader.image.tag }}"
+          imagePullPolicy: {{ .Values.redisLeader.image.pullPolicy }}
+          # Démarre Redis avec notre redis.conf (ConfigMap montée dans /etc/redis)
+          args: ["redis-server", "/etc/redis/redis.conf"]
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            {{- toYaml .Values.redisLeader.readinessProbe | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.redisLeader.livenessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.redisLeader.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /data          # là où redis.conf dit d'écrire
+            - name: config
+              mountPath: /etc/redis     # contient redis.conf
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "guestbook.redisLeader.pvcName" . }}
+        - name: config
+          configMap:
+            name: {{ include "guestbook.componentName" (dict "ctx" . "component" "redis-leader") }}

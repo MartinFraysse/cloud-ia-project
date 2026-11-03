@@ -1,0 +1,10 @@
+# Fichiers exclus du package (helm package) : VCS, éditeurs, sauvegardes.
+.git/
+.gitignore
+.vscode/
+.idea/
+*.swp
+*.bak
+*.tmp
+*~
+.DS_Store

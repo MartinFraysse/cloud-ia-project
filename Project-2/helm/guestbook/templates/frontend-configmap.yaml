@@ -1,0 +1,17 @@
+{{/*
+ConfigMap du frontend : variables d'environnement injectées par envFrom.
+Les adresses Redis sont calculées à partir des noms de Services (_helpers.tpl) :
+le PHP (mode GET_HOSTS_FROM=env) contacte exactement les Services créés par cette release.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "guestbook.componentName" (dict "ctx" . "component" "frontend") }}
+  labels:
+    {{- include "guestbook.componentLabels" (dict "ctx" . "component" "frontend") | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.frontend.env }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  REDIS_LEADER_SERVICE_HOST: {{ include "guestbook.redisLeader.serviceName" . | quote }}
+  REDIS_FOLLOWER_SERVICE_HOST: {{ include "guestbook.redisFollower.serviceName" . | quote }}

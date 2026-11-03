@@ -1,0 +1,10 @@
+# Chart Helm du livre d'or Cloud Hôtels : frontend PHP + Redis leader (persistant) / followers.
+# Un seul chart pour tous les environnements : seules les valeurs (values-<ENV>.yaml) changent.
+apiVersion: v2
+name: guestbook
+description: Livre d'or Cloud Hôtels - frontend PHP et Redis leader/followers avec persistance
+type: application
+# Version du CHART (SemVer) : à incrémenter à chaque modification du chart.
+version: 0.1.0
+# Version de l'APPLICATION déployée (tag de l'image frontend par défaut).
+appVersion: "v5"

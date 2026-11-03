@@ -1,0 +1,25 @@
+{{/*
+Message affiché après helm install / helm upgrade : la commande d'accès dépend du type du
+Service frontend (condition if, exigée par H1 et H2).
+*/}}
+{{- $svc := include "guestbook.frontend.serviceName" . -}}
+{{- $ns := .Release.Namespace -}}
+{{- $port := .Values.frontend.service.port -}}
+Livre d'or installé : release {{ .Release.Name }}, namespace {{ $ns }}, chart {{ include "guestbook.chart" . }}.
+
+Accès au site (Service {{ $svc }}, type {{ .Values.frontend.service.type }}) :
+{{- if eq .Values.frontend.service.type "LoadBalancer" }}
+  1. En local (minikube) : lancer « minikube tunnel » dans un terminal dédié.
+     Sur GKE : l'adresse publique est donnée par Google (1 à 2 minutes).
+  2. Lire la colonne EXTERNAL-IP :
+       kubectl get svc {{ $svc }} -n {{ $ns }} -w
+  3. Ouvrir http://<EXTERNAL-IP>:{{ $port }}
+{{- else }}
+  1. Le Service est interne (ClusterIP) : ouvrir un tunnel depuis le poste :
+       kubectl port-forward svc/{{ $svc }} 8080:{{ $port }} -n {{ $ns }}
+  2. Ouvrir http://localhost:8080
+{{- end }}
+
+Vérifier l'installation :
+  kubectl get all,cm,pvc -n {{ $ns }}
+  helm status {{ .Release.Name }} -n {{ $ns }}

@@ -1,0 +1,14 @@
+{{/*
+ConfigMap des followers : indique au script run.sh de l'image quel leader recopier.
+GET_HOSTS_FROM vaut toujours "env" : c'est ce qui permet de donner nous-mêmes l'adresse du
+leader, calculée à partir du nom du Service leader de cette release.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "guestbook.componentName" (dict "ctx" . "component" "redis-follower") }}
+  labels:
+    {{- include "guestbook.componentLabels" (dict "ctx" . "component" "redis-follower") | nindent 4 }}
+data:
+  GET_HOSTS_FROM: "env"
+  REDIS_LEADER_SERVICE_HOST: {{ include "guestbook.redisLeader.serviceName" . | quote }}

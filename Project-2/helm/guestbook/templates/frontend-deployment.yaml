@@ -1,0 +1,38 @@
+{{/*
+Deployment du frontend PHP/Apache. Sans état → RollingUpdate (stratégie par défaut, pas de bloc strategy).
+L'annotation checksum/config redémarre les pods quand la ConfigMap change, et seulement dans ce cas.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "guestbook.componentName" (dict "ctx" . "component" "frontend") }}
+  labels:
+    {{- include "guestbook.componentLabels" (dict "ctx" . "component" "frontend") | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "guestbook.componentSelectorLabels" (dict "ctx" . "component" "frontend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "guestbook.componentLabels" (dict "ctx" . "component" "frontend") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/frontend-configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: php-redis
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "guestbook.componentName" (dict "ctx" . "component" "frontend") }}
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            {{- toYaml .Values.frontend.readinessProbe | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.frontend.livenessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}

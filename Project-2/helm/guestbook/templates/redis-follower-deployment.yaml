@@ -1,0 +1,40 @@
+{{/*
+Deployment des followers Redis : copies du leader, sans disque, qui servent les lectures.
+RollingUpdate (stratégie par défaut, pas de bloc strategy) : un follower est remplacé sans
+coupure des lectures.
+checksum/config : recrée les pods quand leur ConfigMap change, et seulement dans ce cas.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "guestbook.componentName" (dict "ctx" . "component" "redis-follower") }}
+  labels:
+    {{- include "guestbook.componentLabels" (dict "ctx" . "component" "redis-follower") | nindent 4 }}
+spec:
+  replicas: {{ .Values.redisFollower.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "guestbook.componentSelectorLabels" (dict "ctx" . "component" "redis-follower") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "guestbook.componentLabels" (dict "ctx" . "component" "redis-follower") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/redis-follower-configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: follower
+          image: "{{ .Values.redisFollower.image.repository }}:{{ .Values.redisFollower.image.tag }}"
+          imagePullPolicy: {{ .Values.redisFollower.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "guestbook.componentName" (dict "ctx" . "component" "redis-follower") }}
+          ports:
+            - name: redis
+              containerPort: 6379
+          readinessProbe:
+            {{- toYaml .Values.redisFollower.readinessProbe | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.redisFollower.livenessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.redisFollower.resources | nindent 12 }}

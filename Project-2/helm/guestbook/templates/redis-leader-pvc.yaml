@@ -1,0 +1,21 @@
+{{/*
+Disque persistant du Redis leader, monté sur /data. Il survit à la suppression du pod.
+storageClassName n'est écrit QUE si redisLeader.persistence.storageClass est renseigné :
+absent = StorageClass par défaut du cluster. Écrire storageClassName: "" voudrait dire
+« aucune classe » et le PVC resterait Pending.
+*/}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "guestbook.redisLeader.pvcName" . }}
+  labels:
+    {{- include "guestbook.componentLabels" (dict "ctx" . "component" "redis-leader") | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.redisLeader.persistence.accessMode }}
+  {{- if .Values.redisLeader.persistence.storageClass }}
+  storageClassName: {{ .Values.redisLeader.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.redisLeader.persistence.size }}
