@@ -30,6 +30,7 @@ spec:
         - name: leader
           image: docker.io/redis:6.0.5
           imagePullPolicy: IfNotPresent
+          # Démarre Redis avec notre redis.conf (ConfigMap montée dans /etc/redis)
           args: ["redis-server", "/etc/redis/redis.conf"]
           ports:
             - name: redis

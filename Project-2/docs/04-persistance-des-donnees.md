@@ -294,6 +294,66 @@ kubectl exec -n dev deploy/redis-leader -- redis-cli GET guestbook
 
 ---
 
+## Étape 4.6 — Tests complémentaires
+
+### Vérifier l'ordre de la stratégie `Recreate`
+
+Une mise à jour du leader doit arrêter l'ancien pod **avant** de créer le nouveau.
+
+```bash
+# Terminal 1 (lancé en premier) : observer uniquement le leader
+kubectl get pods -n dev -l app.kubernetes.io/component=redis-leader -w
+
+# Terminal 2 : déclencher une mise à jour du leader
+kubectl rollout restart deploy/redis-leader -n dev
+```
+
+![Ordre des pods avec Recreate](screenshots/23-recreate-ordre-des-pods.png)
+
+| Ordre | Ligne | Signification |
+|---|---|---|
+| ① | `84cb46857f-8px85` `Terminating` puis `Completed` | L'ancien Redis s'arrête |
+| ② | `9965b5457-qn5fc` `Pending` puis `ContainerCreating` | Le nouveau pod n'apparaît **qu'ensuite** |
+| ③ | `9965b5457-qn5fc` `1/1 Running` | Le nouveau Redis est prêt, après 12 s |
+
+En `RollingUpdate`, le nouveau pod serait apparu **avant** l'arrêt de l'ancien. Les lignes
+`Completed` de l'ancien pod plus bas correspondent à la suppression de l'objet : son conteneur
+était déjà arrêté.
+
+```bash
+kubectl exec -n dev deploy/redis-leader -- redis-cli GET guestbook
+```
+
+![Messages après la mise à jour du leader](screenshots/24-redis-get-apres-recreate.png)
+
+✅ Les messages sont conservés après la mise à jour.
+
+### Redémarrage complet de minikube
+
+Les messages doivent survivre à l'arrêt de **tout le cluster**.
+
+```bash
+minikube stop && minikube start
+kubectl get pods -n dev -w               # Ctrl+C quand les 5 pods sont 1/1
+```
+
+![Redémarrage complet de minikube](screenshots/25-redemarrage-minikube-pods.png)
+
+Chaque pod a redémarré (`RESTARTS` augmente de 1) et revient `1/1 Running`.
+
+```bash
+kubectl exec -n dev deploy/redis-leader -- redis-cli GET guestbook
+```
+
+![Messages après le redémarrage de minikube](screenshots/26-redis-get-apres-redemarrage-minikube.png)
+
+✅ Les messages sont conservés : le disque persistant survit à l'arrêt du cluster.
+
+> Après un redémarrage, relancer `minikube tunnel` et relire l'`EXTERNAL-IP` avec
+> `kubectl get svc frontend -n dev` : elle peut avoir changé.
+
+---
+
 ## Vérifications utiles
 
 ```bash
@@ -316,8 +376,9 @@ kubectl exec -n dev deploy/redis-leader -- ls -l /data                   # appen
 - [x] PVC `redis-leader-data` : 1Gi, `ReadWriteOnce`, StorageClass par défaut.
 - [x] Leader en stratégie `Recreate`, démarré avec `redis.conf`, disque monté sur `/data`.
 - [x] Test de non-perte réussi dans `dev` : les messages survivent à la suppression du pod.
-- [ ] Bonus : même test après un redémarrage complet de minikube et après un `helm upgrade`
-  (partie 6).
+- [x] `Recreate` vérifié : l'ancien pod s'arrête avant la création du nouveau.
+- [x] Bonus : messages conservés après un redémarrage complet de minikube.
+- [ ] Bonus : même test après un `helm upgrade` (partie 6).
 
 ➡️ **Suite :** Partie 5 — Le chart Helm *(à venir)*.
 
