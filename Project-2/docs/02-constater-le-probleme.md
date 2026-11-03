@@ -210,7 +210,7 @@ sequenceDiagram
     Note over L,R: Plus aucun message nulle part
 ```
 
-1. Redis garde les messages **en mémoire uniquement**, comme un tableau blanc.
+1. Redis garde les messages **en mémoire uniquement**.
 2. Le pod est recréé **à partir de l'image** : il démarre avec une mémoire vide.
 3. Les copies (`redis-follower`) se resynchronisent sur la nouvelle base… et deviennent vides
    elles aussi.

@@ -13,8 +13,8 @@ La documentation est découpée **en un fichier par partie**. Lire dans l'ordre 
 | 1 | [Préparer le poste de travail](01-preparation-poste.md) | Outils, versions, cluster local | ✅ |
 | 2 | [Constater le problème](02-constater-le-probleme.md) | L'application d'origine et la perte des messages | ✅ |
 | 3 | [Les manifestes Kubernetes](03-manifestes-kubernetes.md) | Les objets de l'application | ✅ |
-| 4 | La persistance des données | Ne plus perdre de messages | ⏳ à venir |
-| 5 | Le chart Helm | Une seule recette pour tous les environnements | ⏳ à venir |
+| 4 | [La persistance des données](04-persistance-des-donnees.md) | Ne plus perdre de messages | ✅ |
+| 5 | Le chart Helm | Un seul chart pour tous les environnements | ⏳ à venir |
 | 6 | Les environnements dev / staging / prod | Installation, mise à jour, retour arrière | ⏳ à venir |
 | 7 | Le cluster GKE avec Terraform | Création du cluster dans Google Cloud | ⏳ à venir |
 | 8 | Le déploiement dans le cloud | Connexion au cluster et mise en ligne | ⏳ à venir |
@@ -38,6 +38,7 @@ Les schémas de la documentation utilisent toujours les mêmes couleurs.
 | 🔷 cyan | Un **Service** (adresse fixe) |
 | 🟦 bleu | Un **Deployment**, un ReplicaSet ou un **cluster** |
 | 🟨 jaune | Une **ConfigMap** (réglages) |
+| 🟧 orange | Le **stockage** : PVC et PV (disque persistant) |
 | ⬜ blanc | Un **pod** |
 | 🩷 rose | **Terraform** |
 | ⬛ gris | Une personne, un outil en ligne de commande, le poste ou le dépôt Git |

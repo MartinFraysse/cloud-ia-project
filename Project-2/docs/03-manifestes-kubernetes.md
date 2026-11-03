@@ -290,10 +290,10 @@ sur `redis-follower`, grâce aux ConfigMaps.
 - [x] Réglages dans 2 ConfigMaps.
 - [x] readiness + liveness et requests + limits sur chaque programme.
 - [x] Application installée et fonctionnelle dans `dev`.
-- [ ] Persistance des messages → partie 4.
+- [ ] Persistance des messages → [partie 4](04-persistance-des-donnees.md).
 
-➡️ **Suite :** Partie 4 — La persistance des données *(à venir)*.
+➡️ **Suite :** [Partie 4 — La persistance des données](04-persistance-des-donnees.md).
 
 ---
 
-[⬅️ Partie 2 — Constater le problème](02-constater-le-probleme.md) · [🏠 Sommaire](README.md)
+[⬅️ Partie 2 — Constater le problème](02-constater-le-probleme.md) · [🏠 Sommaire](README.md) · [Partie 4 — La persistance des données ➡️](04-persistance-des-donnees.md)
