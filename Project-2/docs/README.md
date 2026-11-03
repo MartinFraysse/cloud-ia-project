@@ -14,7 +14,7 @@ La documentation est découpée **en un fichier par partie**. Lire dans l'ordre 
 | 2 | [Constater le problème](02-constater-le-probleme.md) | L'application d'origine et la perte des messages | ✅ |
 | 3 | [Les manifestes Kubernetes](03-manifestes-kubernetes.md) | Les objets de l'application | ✅ |
 | 4 | [La persistance des données](04-persistance-des-donnees.md) | Ne plus perdre de messages | ✅ |
-| 5 | Le chart Helm | Un seul chart pour tous les environnements | ⏳ à venir |
+| 5 | [Le chart Helm](05-chart-helm.md) | Un seul chart pour tous les environnements | ✅ |
 | 6 | Les environnements dev / staging / prod | Installation, mise à jour, retour arrière | ⏳ à venir |
 | 7 | Le cluster GKE avec Terraform | Création du cluster dans Google Cloud | ⏳ à venir |
 | 8 | Le déploiement dans le cloud | Connexion au cluster et mise en ligne | ⏳ à venir |

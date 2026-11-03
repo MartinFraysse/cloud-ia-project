@@ -380,8 +380,8 @@ kubectl exec -n dev deploy/redis-leader -- ls -l /data                   # appen
 - [x] Bonus : messages conservés après un redémarrage complet de minikube.
 - [ ] Bonus : même test après un `helm upgrade` (partie 6).
 
-➡️ **Suite :** Partie 5 — Le chart Helm *(à venir)*.
+➡️ **Suite :** [Partie 5 — Le chart Helm](05-chart-helm.md).
 
 ---
 
-[⬅️ Partie 3 — Les manifestes Kubernetes](03-manifestes-kubernetes.md) · [🏠 Sommaire](README.md)
+[⬅️ Partie 3 — Les manifestes Kubernetes](03-manifestes-kubernetes.md) · [🏠 Sommaire](README.md) · [Partie 5 — Le chart Helm ➡️](05-chart-helm.md)
