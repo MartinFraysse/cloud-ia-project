@@ -18,8 +18,12 @@ Projets du module **Cloud & Infrastructure as Code** (ESIEA, S9).
 │   ├── local/           → environnement local Docker Compose
 │   └── ansible/         → configuration des serveurs et déploiement
 └── Project-2/
+    ├── README.md        → documentation de transfert (point d'entrée)
+    ├── docs/            → documentation par partie + captures d'écran
     ├── k8s/             → manifestes Kubernetes
-    └── helm/guestbook/  → chart Helm
+    ├── helm/guestbook/  → chart Helm
+    ├── terraform/       → cluster GKE Autopilot
+    └── enonce/          → énoncé du projet (non modifié)
 ```
 
 ## Stratégie de branches : trunk-based development

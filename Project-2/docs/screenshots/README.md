@@ -27,6 +27,10 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 | 20 | `20-suppression-pod-leader-persistance.png` | 04-reparer-le-bug | Suppression du pod leader, le nouveau pod passe `1/1 Running` |
 | 21 | `21-messages-conserves-apres-suppression.png` | 04-reparer-le-bug | Après actualisation : **les 3 messages sont toujours là** ✅ |
 | 22 | `22-redis-get-apres-suppression.png` | 04-reparer-le-bug | `redis-cli GET guestbook` dans le nouveau pod : mêmes 3 messages |
+| 23 | `23-recreate-ordre-des-pods.png` | 04-reparer-le-bug | Stratégie `Recreate` : l'ancien pod leader s'arrête **avant** que le nouveau soit créé |
+| 24 | `24-redis-get-apres-recreate.png` | 04-reparer-le-bug | Après la mise à jour du leader : les 3 messages sont toujours là |
+| 25 | `25-redemarrage-minikube-pods.png` | 04-reparer-le-bug | Redémarrage complet de minikube : les 5 pods reviennent `1/1 Running` |
+| 26 | `26-redis-get-apres-redemarrage-minikube.png` | 04-reparer-le-bug | Après le redémarrage complet : les 3 messages sont toujours là |
 
 ---
 
@@ -433,4 +437,80 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 - **Ce qu'on voit :** `,Premier test,Apres ajout,de la persistance`, identique à la capture 18.
 - **À retenir :** c'est un **nouveau** pod (capture 20), mais au démarrage Redis a relu le
   journal `appendonly.aof` sur le disque et retrouvé tous les messages.
+
+---
+
+## 23 — `Recreate` : l'ancien pod s'arrête avant le nouveau
+
+- **Fichier :** `23-recreate-ordre-des-pods.png`
+- **Date :** 2026-11-03
+- **Branche :** `fix/p2-complements-persistance`
+- **Commandes :**
+  ```bash
+  # Terminal 1 (lancé en premier) : observer uniquement le leader
+  kubectl get pods -n dev -l app.kubernetes.io/component=redis-leader -w
+  # Terminal 2 : déclencher une mise à jour du leader
+  kubectl rollout restart deploy/redis-leader -n dev
+  ```
+- **Ce qu'on voit (dans l'ordre) :**
+
+  | Ligne | Signification |
+  |---|---|
+  | `84cb46857f-8px85` `Running` | L'ancien pod leader |
+  | `84cb46857f-8px85` `Terminating` puis `Completed` | ① L'ancien Redis **s'arrête** |
+  | `9965b5457-qn5fc` `Pending` → `ContainerCreating` | ② Le nouveau pod n'apparaît **qu'ensuite** |
+  | `9965b5457-qn5fc` `1/1 Running` (12 s) | ③ Le nouveau Redis est prêt |
+
+- **À retenir :** c'est la preuve de la stratégie `Recreate` (exigence K4). En `RollingUpdate`,
+  le nouveau pod serait apparu **avant** l'arrêt de l'ancien. Le début du nom change
+  (`84cb46857f` → `9965b5457`) : la mise à jour a créé un nouveau ReplicaSet.
+- **Remarque :** les lignes `Completed` de l'ancien pod qui réapparaissent plus bas sont la
+  suppression de l'objet par Kubernetes ; son conteneur était déjà arrêté.
+
+---
+
+## 24 — Messages conservés après la mise à jour du leader
+
+- **Fichier :** `24-redis-get-apres-recreate.png`
+- **Date :** 2026-11-03
+- **Branche :** `fix/p2-complements-persistance`
+- **Commande :** `kubectl exec -n dev deploy/redis-leader -- redis-cli GET guestbook`
+- **Ce qu'on voit :** `,Premier test,Apres ajout,de la persistance`
+- **À retenir :** le nouveau pod (`9965b5457-qn5fc`) a rebranché le même disque et relu le
+  journal AOF : aucune perte pendant une mise à jour.
+
+---
+
+## 25 — Redémarrage complet de minikube
+
+- **Fichier :** `25-redemarrage-minikube-pods.png`
+- **Date :** 2026-11-03
+- **Branche :** `fix/p2-complements-persistance`
+- **Commandes :**
+  ```bash
+  minikube stop && minikube start
+  kubectl get pods -n dev -w      # Ctrl+C quand les 5 pods sont 1/1
+  ```
+- **Ce qu'on voit :**
+
+  | Élément | Signification |
+  |---|---|
+  | `1 node stopped` puis `Restarting existing docker container` | Tout le cluster a été éteint puis rallumé |
+  | `RESTARTS` +1 sur chaque pod (`2` pour frontend / followers, `1` pour le leader) | Tous les conteneurs ont redémarré |
+  | Pods `0/1` puis `1/1` en ~30 à 70 s | Les readiness probes valident chaque pod l'un après l'autre |
+
+- **Remarques :** `minikube 1.39.0 is available` et l'avertissement de version de `kubectl`
+  (1.37.1 contre Kubernetes 1.35.1) sont sans conséquence ici.
+
+---
+
+## 26 — Messages conservés après le redémarrage complet
+
+- **Fichier :** `26-redis-get-apres-redemarrage-minikube.png`
+- **Date :** 2026-11-03
+- **Branche :** `fix/p2-complements-persistance`
+- **Commande :** `kubectl exec -n dev deploy/redis-leader -- redis-cli GET guestbook`
+- **Ce qu'on voit :** `,Premier test,Apres ajout,de la persistance`
+- **À retenir :** bonus de l'exigence K7 réussi : même après l'arrêt **de tout le cluster**, le
+  disque persistant a été conservé et Redis a relu son journal AOF.
 
