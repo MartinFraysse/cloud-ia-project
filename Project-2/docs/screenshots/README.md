@@ -20,6 +20,13 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 | 13 | `13-etat-manifestes-dev.png` | 03-fichiers-propres | `kubectl get all,cm -n dev` : 5 pods Running, 3 Services, 2 ConfigMaps |
 | 14 | `14-endpoints-dev.png` | 03-fichiers-propres | Endpoints non vides : chaque Service trouve ses pods |
 | 15 | `15-application-dev-fonctionnelle.png` | 03-fichiers-propres | L'application déployée avec nos manifestes fonctionne (3 messages) |
+| 16 | `16-apply-persistance-dev.png` | 04-reparer-le-bug | Installation de la persistance dans `dev` : PVC `Bound` (1Gi, RWO, `standard`), leader redéployé |
+| 17 | `17-messages-avant-suppression-persistance.png` | 04-reparer-le-bug | Le livre d'or avec 3 messages, avant la suppression du pod leader |
+| 18 | `18-redis-get-avant-suppression.png` | 04-reparer-le-bug | `redis-cli GET guestbook` : les 3 messages sont dans Redis |
+| 19 | `19-verification-config-redis.png` | 04-reparer-le-bug | `CONFIG GET dir` → `/data`, `appendonly` → `yes`, fichiers de données dans `/data` |
+| 20 | `20-suppression-pod-leader-persistance.png` | 04-reparer-le-bug | Suppression du pod leader, le nouveau pod passe `1/1 Running` |
+| 21 | `21-messages-conserves-apres-suppression.png` | 04-reparer-le-bug | Après actualisation : **les 3 messages sont toujours là** ✅ |
+| 22 | `22-redis-get-apres-suppression.png` | 04-reparer-le-bug | `redis-cli GET guestbook` dans le nouveau pod : mêmes 3 messages |
 
 ---
 
@@ -307,3 +314,123 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
   `kubectl exec -n dev deploy/redis-leader -- redis-cli DEL guestbook` (tous les messages sont
   stockés dans une seule clé Redis, `guestbook`).
 - **Limite restante :** toujours **pas de persistance** → corrigé en partie 4.
+
+---
+
+## 16 — Installation de la persistance dans `dev`
+
+- **Fichier :** `16-apply-persistance-dev.png`
+- **Date :** 2026-11-03
+- **Branche :** `feat/p2-persistance-redis`
+- **Commandes :**
+  ```bash
+  kubectl apply -n dev -f k8s/
+  kubectl get pvc -n dev
+  kubectl rollout status deploy/redis-leader -n dev
+  ```
+- **Ce qu'on voit :**
+
+  | Ligne | Signification |
+  |---|---|
+  | `configmap/redis-leader-config created` | Nouvelle ConfigMap : le fichier `redis.conf` (`dir /data`, `appendonly yes`) |
+  | `persistentvolumeclaim/redis-leader-data created` | Nouveau PVC : la demande de disque |
+  | `deployment.apps/redis-leader configured` | Le leader est modifié (`Recreate`, `args`, volumes) |
+  | tout le reste `unchanged` | Frontend et followers ne sont pas touchés |
+  | PVC `Bound`, `1Gi`, `RWO`, `standard` | Le disque a été créé par la StorageClass **par défaut** de minikube (`standard`) et est lié au PVC |
+  | `successfully rolled out` | Le nouveau pod leader (avec le disque monté sur `/data`) est prêt |
+
+- **À retenir :** `STORAGECLASS = standard` alors qu'on n'a **pas** écrit de `storageClassName`
+  dans le PVC → preuve que la classe par défaut est utilisée (exigence K7). Avec
+  `storageClassName: ""`, le PVC serait resté `Pending`.
+
+---
+
+## 17 — Messages avant la suppression du pod leader (avec persistance)
+
+- **Fichier :** `17-messages-avant-suppression-persistance.png`
+- **Date :** 2026-11-03
+- **Branche :** `feat/p2-persistance-redis`
+- **Accès :** `minikube tunnel` (terminal dédié) + `kubectl get svc frontend -n dev` → `http://<EXTERNAL-IP>`
+- **Ce qu'on voit :** 3 messages : « Premier test », « Apres ajout », « de la persistance ».
+- **À retenir :** même départ que la capture 08 (partie 2), mais cette fois le leader a un disque.
+
+---
+
+## 18 — Les messages sont bien dans Redis
+
+- **Fichier :** `18-redis-get-avant-suppression.png`
+- **Date :** 2026-11-03
+- **Branche :** `feat/p2-persistance-redis`
+- **Commande :** `kubectl exec -n dev deploy/redis-leader -- redis-cli GET guestbook`
+- **Ce qu'on voit :** `,Premier test,Apres ajout,de la persistance`
+- **À retenir :** tous les messages sont dans **une seule clé** Redis, `guestbook`, séparés par
+  des virgules. La virgule au début est normale : l'application ajoute `,message` à la fin de la
+  valeur, qui était vide au départ.
+
+---
+
+## 19 — Redis écrit bien sur le disque persistant
+
+- **Fichier :** `19-verification-config-redis.png`
+- **Date :** 2026-11-03
+- **Branche :** `feat/p2-persistance-redis`
+- **Commandes :**
+  ```bash
+  kubectl exec -n dev deploy/redis-leader -- redis-cli CONFIG GET dir
+  kubectl exec -n dev deploy/redis-leader -- redis-cli CONFIG GET appendonly
+  kubectl exec -n dev deploy/redis-leader -- ls -l /data
+  ```
+- **Ce qu'on voit :**
+
+  | Résultat | Signification |
+  |---|---|
+  | `dir` → `/data` | Redis écrit ses fichiers dans `/data`, là où le PVC est monté (exigence K6) |
+  | `appendonly` → `yes` | Le mode AOF est actif : chaque écriture est journalisée |
+  | `appendonly.aof` (209 octets) | Le journal AOF, qui contient les messages |
+  | `dump.rdb` (175 octets) | Une copie complète créée par le leader quand les **followers** se sont synchronisés (la réplication passe par ce fichier) |
+  | propriétaire `redis redis` | Redis tourne avec l'utilisateur `redis`, pas root (grâce à `args`) |
+
+- **À retenir :** prouve que `redis.conf` (ConfigMap) est bien utilisé et que les données sont
+  sur le disque persistant (exigence K7 : « les fichiers de données Redis dans `/data` »).
+
+---
+
+## 20 — Suppression du pod leader
+
+- **Fichier :** `20-suppression-pod-leader-persistance.png`
+- **Date :** 2026-11-03
+- **Branche :** `feat/p2-persistance-redis`
+- **Commandes :**
+  ```bash
+  kubectl delete pod -n dev -l app.kubernetes.io/component=redis-leader
+  kubectl get pods -n dev -w      # Ctrl+C une fois le nouveau pod prêt
+  ```
+- **Ce qu'on voit :** le pod `redis-leader-84cb46857f-jljpl` est supprimé ; le Deployment en
+  recrée un nouveau, `redis-leader-84cb46857f-8px85`, qui passe de `0/1` à `1/1 Running` en
+  ~12 s (le temps que la readiness probe réussisse).
+- **À retenir :** même manipulation que la capture 09 (partie 2). Le nouveau pod rebranche le
+  **même PVC** sur `/data`.
+
+---
+
+## 21 — Les messages sont conservés ✅
+
+- **Fichier :** `21-messages-conserves-apres-suppression.png`
+- **Date :** 2026-11-03
+- **Branche :** `feat/p2-persistance-redis`
+- **Ce qu'on voit :** après actualisation de la page, les 3 messages sont **toujours là**.
+- **À retenir :** c'est le **test de non-perte imposé** (K7) : réussi. À comparer avec la
+  capture 10 (partie 2), où tous les messages avaient disparu.
+
+---
+
+## 22 — Le nouveau pod a relu les messages
+
+- **Fichier :** `22-redis-get-apres-suppression.png`
+- **Date :** 2026-11-03
+- **Branche :** `feat/p2-persistance-redis`
+- **Commande :** `kubectl exec -n dev deploy/redis-leader -- redis-cli GET guestbook`
+- **Ce qu'on voit :** `,Premier test,Apres ajout,de la persistance`, identique à la capture 18.
+- **À retenir :** c'est un **nouveau** pod (capture 20), mais au démarrage Redis a relu le
+  journal `appendonly.aof` sur le disque et retrouvé tous les messages.
+
