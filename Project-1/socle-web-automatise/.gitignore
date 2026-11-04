@@ -1,9 +1,32 @@
-ssh/vault_pass.txt
-*.retry
-__pycache__/
-.ansible-lint-cache/
+# =============================================================================
+# socle-web-automatise/.gitignore — complète le .gitignore racine du dépôt.
+# Règle : aucun secret, state, clé ou identifiant propre à une session de lab n'est versionné.
+# =============================================================================
+
+# --- Secrets locaux ---
+# Mot de passe Ansible Vault (transmis hors Git, cf. README « Prérequis et accès »)
+.vault_pass*
+# Identifiants GCP copiés pour le controller par scripts/prepare-cloud-inventory.sh
+.secrets/
+
+# --- Clés SSH générées par local/scripts/generate-keys.sh ---
 local/ssh/
 local/node/authorized_keys
-.vault_pass*
+
+# --- Ansible : dépendances Galaxy installées (versions épinglées dans requirements.yml) ---
 ansible/roles/geerlingguy.*
+ansible/collections/
+# Inventaire cloud GÉNÉRÉ (contient le project_id de la session de lab) ; le modèle
+# fleet.gcp.yml.example, lui, est versionné.
+ansible/inventories/cloud/fleet.gcp.yml
+# Caches et artefacts
 .ansible/
+*.retry
+__pycache__/
+
+# --- Terraform (déjà couvert par le .gitignore racine, rappelé ici par sécurité) ---
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/terraform.tfvars
+terraform/*.tfplan

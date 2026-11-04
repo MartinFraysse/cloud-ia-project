@@ -1,0 +1,8 @@
+# socle-web-automatise/.gitattributes — fins de ligne LF forcées pour les fichiers exécutés
+# dans des conteneurs Linux : un script extrait en CRLF sous Windows échouerait
+# ("/bin/sh^M: bad interpreter").
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+*.yml           text eol=lf
+*.j2            text eol=lf
+ansible.cfg     text eol=lf

@@ -1,15 +1,19 @@
 {
-  "name": "Socle Web Automatisé - local",
+  // .devcontainer/devcontainer.json — ouvre le controller du banc local dans VS Code
+  // (extension Dev Containers). Prérequis : local/scripts/generate-keys.sh déjà lancé.
+  // Équivalent sans VS Code : cd local && docker compose up -d --build --wait
+  //                           docker compose exec controller bash
+  "name": "Socle Web Automatisé - controller",
   "dockerComposeFile": "../local/docker-compose.yml",
   "service": "controller",
   "workspaceFolder": "/workspace",
   "containerEnv": {
-    "ANSIBLE_CONFIG": "/workspace/ansible/ansible.cfg",
-    "ANSIBLE_VAULT_PASSWORD_FILE": "/workspace/.vault_pass"
+    "ANSIBLE_CONFIG": "/workspace/ansible/ansible.cfg"
   },
-  "postCreateCommand": "chmod 600 local/ssh/fleet_key && cd ansible && ansible-galaxy install -r requirements.yml",
+  // Collections et rôle public aux versions épinglées (installés dans ansible/, ignorés par Git)
+  "postCreateCommand": "cd ansible && ansible-galaxy install -r requirements.yml",
   "customizations": {
-    "vscode": { "extensions": ["redhat.ansible", "redhat.vscode-yaml"] }
+    "vscode": { "extensions": ["redhat.ansible", "redhat.vscode-yaml", "hashicorp.terraform"] }
   },
   "remoteUser": "root"
 }

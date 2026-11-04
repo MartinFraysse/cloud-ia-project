@@ -1,0 +1,8 @@
+# local/controller/requirements.txt — dépendances Python du controller, versions ÉPINGLÉES.
+# ansible-core 2.17 (et non le paquet "ansible" complet) : seules les collections déclarées
+# dans ansible/requirements.yml sont utilisées, avec leurs versions épinglées.
+ansible-core==2.17.14
+ansible-lint==25.9.2
+# Dépendances du plugin d'inventaire google.cloud.gcp_compute (environnement cloud)
+google-auth==2.62.1
+requests==2.34.2

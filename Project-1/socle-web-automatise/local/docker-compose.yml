@@ -1,51 +1,82 @@
-# Rôle : banc local = 1 controller (Ansible) + 2 nœuds Debian 12 / systemd gérés en SSH.
-# Reprise du docker-compose des labs. Les chemins sont relatifs à ce fichier (dossier local/).
-# Les options privileged / cgroup / volumes / tmpfs permettent à systemd de tourner en PID 1.
+# =============================================================================
+# local/docker-compose.yml — banc local : 1 controller (Ansible) + 2 nœuds Debian 12 / systemd.
+#
+# Les nœuds se comportent comme des VM GCP : systemd en PID 1, sshd, python3, sudo. Ansible les
+# gère exactement comme les VM du cloud (connexion SSH, modules service/systemd, handlers...).
+# Reprise du docker-compose des labs. Chemins relatifs à CE fichier (dossier local/).
+#
+#   ./scripts/generate-keys.sh          # une fois : clé SSH controller -> nœuds (non versionnée)
+#   docker compose up -d --build --wait  # construit et démarre le banc
+#   docker compose exec controller bash  # shell Ansible, dans /workspace/ansible
+# =============================================================================
+name: fleetinfo-local
+
+# Définition commune des nœuds (ancre YAML) : ajouter un nœud = 6 lignes dans "services".
+x-node: &node
+  build:
+    context: ./node
+  image: fleetinfo-local/node:debian12   # une seule image construite, partagée par les nœuds
+  privileged: true           # systemd doit gérer les cgroups et monter des FS (banc local uniquement)
+  cgroup: host               # partage les cgroups (v2) de l'hôte, exigé par systemd en conteneur
+  volumes:
+    - /sys/fs/cgroup:/sys/fs/cgroup:rw
+  tmpfs:                     # systemd veut /run et /run/lock en mémoire, vides à chaque démarrage
+    - /run
+    - /run/lock
+  healthcheck:               # "sain" = sshd démarré par systemd : Ansible peut se connecter
+    test: ["CMD", "systemctl", "is-active", "--quiet", "ssh"]
+    interval: 5s
+    timeout: 3s
+    retries: 12
+  networks:
+    - labnet
 
 services:
   controller:
     build:
       context: ./controller
+    image: fleetinfo-local/controller:ansible-core-2.17
+    init: true                 # PID 1 minimal : "docker compose stop" est immédiat
+    working_dir: /workspace/ansible
+    environment:
+      # Chemin explicite : Ansible ignore un ansible.cfg situé dans un dossier accessible en
+      # écriture à tous, ce qui est le cas des montages de fichiers sous Windows.
+      ANSIBLE_CONFIG: /workspace/ansible/ansible.cfg
+      # Mot de passe Vault lu par un script de l'image dans /workspace/.vault_pass (prioritaire
+      # sur vault_password_file d'ansible.cfg) : fonctionne aussi avec les montages Windows.
+      ANSIBLE_VAULT_PASSWORD_FILE: /usr/local/bin/fleet-vault-pass
+      # Identifiants GCP pour l'inventaire dynamique (environnement cloud uniquement), copiés
+      # par scripts/prepare-cloud-inventory.sh. Sans effet tant que le fichier n'existe pas.
+      GOOGLE_APPLICATION_CREDENTIALS: /workspace/.secrets/gcp-adc.json
     volumes:
-      - ..:/workspace:cached   # racine du dépôt montée dans le controller
-    command: sleep infinity    # garde le conteneur vivant pour VS Code
+      - ..:/workspace:cached   # racine du socle (socle-web-automatise/) montée dans le controller
     networks:
       - labnet
     depends_on:
-      - node1
-      - node2
+      node1:
+        condition: service_healthy
+      node2:
+        condition: service_healthy
 
   node1:
-    build:
-      context: ./node
+    <<: *node
     hostname: node1
-    privileged: true           # systemd doit gérer les cgroups et monter des FS (banc local uniquement)
-    cgroup: host               # partage les cgroups (v2) de l'hôte, exigé par systemd
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
-    tmpfs:                     # systemd veut /run et /run/lock en mémoire, vides à chaque démarrage
-      - /run
-      - /run/lock
     ports:
       - "8081:80"              # page Fleet Info de node1 : http://localhost:8081
-    networks:
-      - labnet
 
   node2:
-    build:
-      context: ./node
+    <<: *node
     hostname: node2
-    privileged: true
-    cgroup: host
-    volumes:
-      - /sys/fs/cgroup:/sys/fs/cgroup:rw
-    tmpfs:
-      - /run
-      - /run/lock
     ports:
       - "8082:80"              # page Fleet Info de node2 : http://localhost:8082
-    networks:
-      - labnet
+
+  # Ajouter un nœud (runbook « Ajouter ou retirer un serveur ») : décommenter, puis déclarer
+  # node3 dans ansible/inventories/local/hosts.yml et dans depends_on du controller.
+  # node3:
+  #   <<: *node
+  #   hostname: node3
+  #   ports:
+  #     - "8083:80"
 
 networks:
   labnet:
