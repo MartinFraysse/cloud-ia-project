@@ -64,6 +64,16 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 | 57 | `57-terraform-plan-no-changes.png` | 07-serveur-google | idempotence : `terraform plan` → `No changes` |
 | 58 | `58-terraform-output.png` | 07-serveur-google | `terraform output` + lecture de l'endpoint sensible (`-raw`) |
 | 59 | `59-terraform-state-list.png` | 07-serveur-google | `terraform state list` : ce que Terraform gère réellement |
+| 60 | `60-kubectl-current-context-gke.png` | 08-installer-cloud | `kubectl config current-context` → contexte GKE |
+| 61 | `61-kubectl-cluster-info-storageclass-namespaces.png` | 08-installer-cloud | `cluster-info`, `get storageclass` (`standard-rwo` par défaut), `get namespaces` |
+| 62 | `62-gke-helm-install-dev-clusterip.png` | 08-installer-cloud | `helm install stack-dev` en ClusterIP sur GKE + démarrage des pods |
+| 63 | `63-gke-port-forward-dev.png` | 08-installer-cloud | `kubectl port-forward` vers le frontend de dev sur GKE |
+| 64 | `64-gke-site-dev-port-forward.png` | 08-installer-cloud | site de dev par le tunnel (`127.0.0.1:8080`), message « Salut Dev ! » |
+| 65 | `65-gke-helm-upgrade-dev-loadbalancer.png` | 08-installer-cloud | `helm upgrade stack-dev` sans `--set` → Service LoadBalancer |
+| 66 | `66-gke-svc-dev-ip-publique.png` | 08-installer-cloud | Service frontend de dev : `EXTERNAL-IP` publique attribuée par Google |
+| 67 | `67-gke-helm-install-staging-prod-list.png` | 08-installer-cloud | `helm install` staging et prod sur GKE + `helm list -A` : 3 releases |
+| 68 | `68-gke-svc-loadbalancer-trois-ip.png` | 08-installer-cloud | les 3 frontends en LoadBalancer, chacun avec son IP publique |
+| 69 | `69-gke-persistance-prod-pvc-pv-disques.png` | 08-installer-cloud | pod leader de prod supprimé et recréé ; PVC, PV et disques Google |
 
 ---
 
@@ -1102,4 +1112,174 @@ et son nom bloquerait Terraform) : on utilise seulement son projet GCP temporair
   exacte de ce que Terraform a créé et qu'il supprimera au `terraform destroy` (exigence T9 :
   documenter « ce que le module crée réellement »). Les `[0]` viennent du `count` utilisé dans
   le module (ressource optionnelle, ici créée une fois).
+
+---
+
+## 60 et 61 — Connexion de `kubectl` au cluster GKE
+
+**Contexte :** nouvelle session de lab, cluster recréé par `terraform apply`, puis
+`eval "$(terraform output -raw get_credentials_command)"` (= `gcloud container clusters
+get-credentials autopilot-cluster-1 --location <REGION> --project <PROJECT_ID>`), qui ajoute le
+cluster dans `~/.kube/config` et le sélectionne.
+
+### 60 — Le contexte courant
+
+- **Fichier :** `60-kubectl-current-context-gke.png` · **Date :** 2026-11-04
+- **Commande :** `kubectl config current-context`
+- **Ce qu'on voit :** `gke_<PROJECT_ID>_us-east1_autopilot-cluster-1`.
+- **À retenir :** format du nom : `gke_<projet>_<région>_<cluster>`. C'est la commande à lancer
+  **avant chaque `helm install` / `helm upgrade`** pour savoir sur quel cluster on travaille
+  (exigence T8).
+
+### 61 — Le cluster répond
+
+- **Fichier :** `61-kubectl-cluster-info-storageclass-namespaces.png` · **Date :** 2026-11-04
+- **Commandes :** `kubectl cluster-info`, `kubectl get storageclass`, `kubectl get namespaces`
+- **Ce qu'on voit :**
+  - `Kubernetes control plane is running at https://<endpoint>` : la même adresse que l'output
+    Terraform `cluster_endpoint`.
+  - StorageClasses : **`standard-rwo (default)`** (provisionneur `pd.csi.storage.gke.io`, disque
+    persistant Google, `WaitForFirstConsumer`, `ALLOWVOLUMEEXPANSION true`), plus d'autres classes
+    fournies par GKE (`premium-rwo`, `standard`, `gcsfusecsi-*`…).
+  - Namespaces : uniquement ceux du système (`default`, `kube-*`, `gke-*`, `gmp-*`) : le cluster
+    est vide, `dev` / `staging` / `prod` n'existent pas encore.
+- **À retenir :**
+  - Exigence T8 : `kubectl get namespaces` fonctionne sur le cluster GKE.
+  - Le PVC du chart n'écrit **pas** de `storageClassName` : sur GKE il recevra automatiquement
+    `standard-rwo`, la classe par défaut (sur minikube : `standard`). Même chart, aucune
+    modification (K7).
+  - `WaitForFirstConsumer` : le disque n'est créé qu'au démarrage du pod qui l'utilise, dans la
+    même zone que lui.
+  - `ALLOWVOLUMEEXPANSION true` : la taille du PVC pourra être augmentée (pas sur minikube).
+
+---
+
+## 62 — `stack-dev` installé sur GKE en ClusterIP
+
+- **Fichier :** `62-gke-helm-install-dev-clusterip.png` · **Date :** 2026-11-04
+- **Commandes :** `kubectl config current-context` (contexte GKE), puis
+  `helm install stack-dev helm/guestbook/ --namespace dev --create-namespace -f helm/guestbook/values-dev.yaml --set frontend.service.type=ClusterIP`,
+  puis `kubectl get pods -n dev -w`.
+- **Ce qu'on voit :**
+  - Contexte vérifié **avant** la commande Helm : `gke_<PROJECT_ID>_us-east1_autopilot-cluster-1`.
+  - `STATUS: deployed`, `REVISION: 1`, chart `guestbook-0.3.0` : **le même chart** qu'en local.
+  - NOTES : « type ClusterIP », « ouvrir un tunnel depuis le poste », commande
+    `kubectl port-forward` proposée.
+  - Pods : `Pending` ~65 s → `ContainerCreating` → `1/1 Running` (frontend et follower ~95 s,
+    **leader 2 min 33 s**), 0 redémarrage.
+- **À retenir :**
+  - Phase de **test** imposée par l'énoncé : le site n'est pas exposé sur Internet (ClusterIP).
+  - `Pending` : **Autopilot crée les nœuds à la demande** (cluster vide au départ).
+  - Leader plus long : la StorageClass `standard-rwo` est en `WaitForFirstConsumer` ; le disque
+    persistant Google n'est créé qu'une fois le pod placé sur un nœud, puis il est attaché.
+  - Les installations suivantes sont plus rapides (nœuds et images déjà présents).
+
+---
+
+## 63 et 64 — Test de dev sur GKE par `port-forward`
+
+### 63 — Le tunnel
+
+- **Fichier :** `63-gke-port-forward-dev.png` · **Date :** 2026-11-04
+- **Commande :** `kubectl port-forward svc/stack-dev-guestbook-frontend 8080:8080 -n dev`
+  (celle proposée par les NOTES), dans un terminal laissé ouvert.
+- **Ce qu'on voit :** `Forwarding from 127.0.0.1:8080 -> 80`, puis `Handling connection for 8080`
+  à chaque requête du navigateur.
+- **À retenir :** port **local** 8080 → port **du Service** 8080 → port du **conteneur** 80
+  (Apache). Le tunnel passe par l'API Kubernetes du cluster : rien n'est ouvert sur Internet.
+
+### 64 — Le site par le tunnel
+
+- **Fichier :** `64-gke-site-dev-port-forward.png` · **Date :** 2026-11-04
+- **Action :** ouvrir `http://127.0.0.1:8080`, saisir un message.
+- **Ce qu'on voit :** le livre d'or de dev sur GKE, avec le message **« Salut Dev ! »**.
+- **À retenir :** étape « test » de l'énoncé (ClusterIP + port-forward) validée : l'application
+  fonctionne sur GKE (frontend → Redis leader pour l'écriture, follower pour la lecture) sans
+  être exposée. Ce message doit encore être là après le passage en LoadBalancer.
+
+---
+
+## 65 et 66 — Ouverture de dev sur Internet (LoadBalancer)
+
+### 65 — `helm upgrade` sans le `--set`
+
+- **Fichier :** `65-gke-helm-upgrade-dev-loadbalancer.png` · **Date :** 2026-11-04
+- **Commande :** `helm upgrade stack-dev helm/guestbook -n dev -f helm/guestbook/values-dev.yaml`
+- **Ce qu'on voit :** `Upgrade complete`, `STATUS: deployed`, chart `guestbook-0.3.0` ; les
+  NOTES indiquent maintenant **« type LoadBalancer »** et « Sur GKE : l'adresse publique est
+  donnée par Google (1 à 2 minutes) ».
+- **À retenir :** sans le `--set frontend.service.type=ClusterIP`, Helm repart des fichiers de
+  valeurs : `values.yaml` donne `LoadBalancer`. Aucun fichier modifié, aucun `kubectl` à la main.
+  (`REVISION: 3` : un `upgrade` intermédiaire avait été lancé entre l'install et celui-ci.)
+
+### 66 — L'adresse publique
+
+- **Fichier :** `66-gke-svc-dev-ip-publique.png` · **Date :** 2026-11-04
+- **Commande :** `kubectl get svc stack-dev-guestbook-frontend -n dev -w`
+- **Ce qu'on voit :** `TYPE LoadBalancer`, `EXTERNAL-IP 35.185.105.148`, `PORT(S) 8080:30630/TCP`.
+- **À retenir :**
+  - Sur GKE, c'est **Google** qui crée un équilibreur de charge et lui donne une **IP publique**
+    (pas besoin de `minikube tunnel`). Site : `http://<EXTERNAL-IP>:8080`.
+  - La `CLUSTER-IP` (`34.118.…`) est l'adresse **interne** du Service, dans la plage réservée
+    aux Services par GKE : elle n'est pas joignable depuis Internet.
+  - Cette IP change à chaque création du Service : toujours relire la colonne `EXTERNAL-IP`.
+
+---
+
+## 67 — staging et prod sur GKE, les 3 releases
+
+- **Fichier :** `67-gke-helm-install-staging-prod-list.png` · **Date :** 2026-11-04
+- **Commandes :** boucle `for env in staging prod; do helm install stack-$env helm/guestbook -n $env --create-namespace -f helm/guestbook/values-$env.yaml; done`,
+  puis `helm list -A`.
+- **Ce qu'on voit :**
+  - `stack-staging` (namespace `staging`) et `stack-prod` (namespace `prod`) : `STATUS: deployed`,
+    `REVISION: 1`, chart `guestbook-0.3.0`, type **LoadBalancer** ; les NOTES donnent `:8081`
+    et `:80`.
+  - `helm list -A` : **3 releases `deployed`** — `stack-dev` (révision 3), `stack-staging`,
+    `stack-prod` — toutes en `guestbook-0.3.0`, `APP VERSION v5`.
+- **À retenir :** staging et prod installés **directement en LoadBalancer** : la séquence de test
+  ClusterIP → port-forward a été faite sur dev (exigence de l'énoncé). Exigence H5 sur GKE :
+  `helm list -A` affiche les 3 releases dans leurs namespaces, avec **le même chart** qu'en local.
+
+---
+
+## 68 — Les 3 adresses publiques sur GKE
+
+- **Fichier :** `68-gke-svc-loadbalancer-trois-ip.png` · **Date :** 2026-11-04
+- **Commande :** `kubectl get svc -A | grep LoadBalancer`
+- **Ce qu'on voit :**
+
+  | Env | EXTERNAL-IP | Port | Site |
+  |---|---|---|---|
+  | dev | `35.185.105.148` | 8080 | `http://35.185.105.148:8080` |
+  | staging | `35.237.218.103` | 8081 | `http://35.237.218.103:8081` |
+  | prod | `34.138.148.129` | 80 | `http://34.138.148.129` |
+
+- **À retenir :** sur GKE, **chaque** Service LoadBalancer reçoit **sa propre IP publique**
+  (un équilibreur de charge Google par environnement) : les ports différents ne sont pas
+  nécessaires ici, mais le **même chart** et les **mêmes fichiers de valeurs** qu'en local sont
+  utilisés. Ces IP sont propres à la session : relire la colonne `EXTERNAL-IP` à chaque fois.
+
+---
+
+## 69 — Persistance en prod sur GKE : du pod au disque Google
+
+- **Fichier :** `69-gke-persistance-prod-pvc-pv-disques.png` · **Date :** 2026-11-04
+- **Commandes :**
+  `kubectl delete pod -n prod -l app.kubernetes.io/component=redis-leader`,
+  `kubectl get pods -n prod -w`, `kubectl get pvc -n prod`, `kubectl get pv`,
+  `gcloud compute disks list`.
+- **Ce qu'on voit :**
+  - Le leader `…-bmchf` est supprimé ; le Deployment en recrée un (`…-2lhg8`) : `0/1` puis
+    **`1/1` en 12 s** (le nœud et le disque existent déjà). Frontends et followers intacts.
+  - PVC `stack-prod-guestbook-redis-leader-data` : **`Bound`, 5Gi, `RWO`, `standard-rwo`**.
+  - 3 PV `Bound` (prod 5Gi, staging 1Gi, dev 1Gi), tous en `standard-rwo`, `RECLAIM POLICY Delete`.
+  - `gcloud compute disks list` : **3 disques persistants Google** (`pd-balanced`, zone
+    `us-east1-c`, 5 / 1 / 1 Go, `READY`), qui portent **le même nom que les PV**.
+- **À retenir :**
+  - Exigence K7 sur GKE : PVC créé par la **StorageClass par défaut** (`standard-rwo`), sans
+    aucune modification du chart.
+  - **Où sont les données :** pod → PVC → PV → **disque persistant Google** dans le projet.
+    Le pod est jetable, le disque ne l'est pas : le nouveau leader rebranche le même disque.
+  - Disque **zonal** (`us-east1-c`) : le pod qui l'utilise est placé dans cette zone.
 

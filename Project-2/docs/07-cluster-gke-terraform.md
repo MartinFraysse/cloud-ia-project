@@ -330,8 +330,8 @@ terraform destroy      # taper "yes" ; plusieurs minutes
 - [x] Ressources réellement créées listées (`state list`).
 - [x] Choix du state local documenté (risques, backend GCS en entreprise).
 
-➡️ **Suite :** Partie 8 — Le déploiement dans le cloud *(à venir)*.
+➡️ **Suite :** [Partie 8 — Le déploiement dans le cloud](08-deploiement-gke.md).
 
 ---
 
-[⬅️ Partie 6 — Les environnements dev / staging / prod](06-environnements-dev-staging-prod.md) · [🏠 Sommaire](README.md)
+[⬅️ Partie 6 — Les environnements dev / staging / prod](06-environnements-dev-staging-prod.md) · [🏠 Sommaire](README.md) · [Partie 8 — Le déploiement dans le cloud ➡️](08-deploiement-gke.md)
