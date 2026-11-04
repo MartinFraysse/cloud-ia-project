@@ -17,7 +17,7 @@ La documentation est découpée **en un fichier par partie**. Lire dans l'ordre 
 | 5 | [Le chart Helm](05-chart-helm.md) | Un seul chart pour tous les environnements | ✅ |
 | 6 | [Les environnements dev / staging / prod](06-environnements-dev-staging-prod.md) | Installation, mise à jour, retour arrière | ✅ |
 | 7 | [Le cluster GKE avec Terraform](07-cluster-gke-terraform.md) | Création du cluster dans Google Cloud | ✅ |
-| 8 | Le déploiement dans le cloud | Connexion au cluster et mise en ligne | ⏳ à venir |
+| 8 | [Le déploiement dans le cloud](08-deploiement-gke.md) | Connexion au cluster et mise en ligne | ✅ |
 | 9 | Exploitation | Runbooks, dépannage, limites connues | ⏳ à venir |
 
 ## En une phrase
