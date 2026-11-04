@@ -67,7 +67,7 @@ frontend:
 # Redis leader (écritures, persistant)
 # ---------------------------------------------------------------------------
 redisLeader:
-  # -- 0 ou 1 uniquement (un seul leader, volume RWO). Le chart refuse toute autre valeur.
+  # -- 0 ou 1 uniquement : un seul leader, car le volume RWO ne se branche qu'à un seul pod.
   replicaCount: 1
   image:
     # -- Image Redis officielle.
@@ -79,7 +79,7 @@ redisLeader:
   service:
     # -- Nom du Service (vide = "<release>-guestbook-redis-leader"). Repris dans les ConfigMaps.
     name: ""
-    # -- Port du Service. DOIT rester 6379 (codé en dur dans les images) : le chart le vérifie.
+    # -- Port du Service. DOIT rester 6379 : il est codé en dur dans le PHP du frontend et le run.sh des followers.
     port: 6379
   # -- Ressources du conteneur leader.
   resources:
@@ -127,7 +127,7 @@ redisFollower:
   service:
     # -- Nom du Service (vide = "<release>-guestbook-redis-follower"). Repris dans la ConfigMap frontend.
     name: ""
-    # -- Port du Service. DOIT rester 6379 : le chart le vérifie.
+    # -- Port du Service. DOIT rester 6379 : il est codé en dur dans le PHP du frontend.
     port: 6379
   # -- Ressources du conteneur follower.
   resources:

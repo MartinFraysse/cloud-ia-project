@@ -53,6 +53,17 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 | 46 | `46-keep-prod-message-apres-reinstall.png` | 06-trois-environnements | bonus `keep` : « Je suis la prod » réapparaît après `helm uninstall` + `helm install` |
 | 47 | `47-helm-rollback-prod-0-3-0-history.png` | 06-trois-environnements | montée en 0.3.0 puis `helm rollback stack-prod 1` : historique |
 | 48 | `48-helm-rollback-prod-message-conserve.png` | 06-trois-environnements | message de prod toujours là après le rollback |
+| 49 | `49-terraform-tfvars-rempli.png` | 07-serveur-google | `terraform.tfvars` rempli (projet du lab, `us-east1`) |
+| 50 | `50-gcloud-auth-login-set-project.png` | 07-serveur-google | `gcloud auth login` + `gcloud config set project` |
+| 51 | `51-gcloud-application-default-login.png` | 07-serveur-google | `gcloud auth application-default login` (identifiants pour Terraform) |
+| 52 | `52-gcloud-set-quota-project.png` | 07-serveur-google | `gcloud auth application-default set-quota-project` |
+| 53 | `53-gcloud-roles-compte-lab.png` | 07-serveur-google | rôles du compte du lab : `roles/owner` présent |
+| 54 | `54-gcloud-services-enable-container.png` | 07-serveur-google | activation de l'API GKE (`container.googleapis.com`) |
+| 55 | `55-terraform-plan.png` | 07-serveur-google | `terraform plan` : 7 ressources à créer, outputs prévus |
+| 56 | `56-terraform-apply-outputs.png` | 07-serveur-google | `terraform apply` : 7 ressources créées + outputs |
+| 57 | `57-terraform-plan-no-changes.png` | 07-serveur-google | idempotence : `terraform plan` → `No changes` |
+| 58 | `58-terraform-output.png` | 07-serveur-google | `terraform output` + lecture de l'endpoint sensible (`-raw`) |
+| 59 | `59-terraform-state-list.png` | 07-serveur-google | `terraform state list` : ce que Terraform gère réellement |
 
 ---
 
@@ -922,4 +933,173 @@ La surcharge se fait par `--set` sur la ligne de commande, **sans** fichier de v
 - **À retenir (47 → 48) :** exigence H6 « montée de version en direct, puis retour à la révision
   précédente ; les messages saisis restent visibles à chaque étape » ✅. Un rollback **ajoute**
   une révision (copie de la révision visée) et ne touche pas au disque.
+
+---
+
+## 49 à 54 — Préparation de la session de lab (connexion et contrôles)
+
+**Contexte :** le lien de lab de l'énoncé (`labs/619578`) ne fonctionne plus (« access denied » :
+le lab n'existe plus dans le cours). Lab utilisé à la place, dans le même cours
+(« Getting Started with Google Kubernetes Engine ») : **Deploying GKE Autopilot Clusters from
+Cloud Shell** — `https://www.skills.google/paths/11/course_templates/2/labs/686877` (1 crédit,
+1 heure). Ses instructions utilisent la région `us-east1` et le nom `autopilot-cluster-1`, le
+nom imposé par l'énoncé. On n'exécute **pas** les tâches du lab (le cluster serait créé à la main
+et son nom bloquerait Terraform) : on utilise seulement son projet GCP temporaire.
+
+> Le projet et le compte visibles sur ces captures sont **temporaires** : ils sont supprimés à
+> la fin de la session de lab. Dans la doc, ils sont notés `<PROJECT_ID>` et `<COMPTE_DU_LAB>`.
+
+### 49 — `terraform.tfvars` rempli
+
+- **Fichier :** `49-terraform-tfvars-rempli.png` · **Date :** 2026-11-04 · **Branche :** `feat/p2-terraform-gke`
+- **Action :** `cp terraform.tfvars.example terraform.tfvars`, puis saisie des 2 valeurs.
+- **Ce qu'on voit :** `project_id` = ID du projet du lab (panneau du lab) ; `region = "us-east1"`
+  (instructions du lab, Task 1 : `export my_region=us-east1`).
+- **À retenir :** seules 2 valeurs à saisir, les autres variables ont un défaut. Ce fichier
+  n'est **pas** versionné (`.gitignore` : `*.tfvars`).
+
+### 50 — Connexion de `gcloud` et choix du projet
+
+- **Fichier :** `50-gcloud-auth-login-set-project.png` · **Date :** 2026-11-04
+- **Commandes :** `gcloud auth login` (navigateur, compte du lab) puis
+  `gcloud config set project <PROJECT_ID>`.
+- **Ce qu'on voit :** `You are now logged in as [<COMPTE_DU_LAB>]`, puis `Updated property [core/project]`.
+- **Remarque :** le `WARNING: RESOURCE_EXHAUSTED … cloudresourcemanager … project_number:32555940559`
+  est **sans gravité** : c'est le quota du projet Google partagé par tous les utilisateurs de
+  `gcloud` (vérification de l'existence du projet), pas celui du lab. Répondre `y`.
+
+### 51 — Identifiants pour Terraform (ADC)
+
+- **Fichier :** `51-gcloud-application-default-login.png` · **Date :** 2026-11-04
+- **Commande :** `gcloud auth application-default login` (même compte du lab).
+- **Ce qu'on voit :** `Credentials saved to file: [~/.config/gcloud/application_default_credentials.json]`.
+- **À retenir :** **deux connexions distinctes** : `gcloud auth login` sert aux commandes
+  `gcloud` / `kubectl` ; `application-default login` sert aux programmes comme Terraform
+  (provider `google`). Aucun identifiant n'est écrit dans le code.
+
+### 52 — Projet de quota des identifiants
+
+- **Fichier :** `52-gcloud-set-quota-project.png` · **Date :** 2026-11-04
+- **Commande :** `gcloud auth application-default set-quota-project <PROJECT_ID>`.
+- **À retenir :** les appels d'API de Terraform sont comptés sur le projet du lab (évite des
+  avertissements ou refus de quota).
+
+### 53 — Rôles du compte du lab
+
+- **Fichier :** `53-gcloud-roles-compte-lab.png` · **Date :** 2026-11-04
+- **Commande :**
+  `gcloud projects get-iam-policy <PROJECT_ID> --flatten="bindings[].members" --filter="bindings.members:$(gcloud config get-value account)" --format="value(bindings.role)"`
+- **Ce qu'on voit :** `roles/owner` (avec `editor`, `viewer`, `appengine.appAdmin`,
+  `bigquery.admin`, `ml.admin`).
+- **À retenir :** le module GKE crée un **compte de service** et lui donne des **droits IAM sur
+  le projet** (`google_project_iam_member`). Cela demande `roles/owner` (un simple `editor` ne
+  peut pas modifier les droits IAM). Vérifié **avant** le `terraform apply`.
+
+### 54 — Activation de l'API GKE
+
+- **Fichier :** `54-gcloud-services-enable-container.png` · **Date :** 2026-11-04
+- **Commande :** `gcloud services enable container.googleapis.com`
+- **Ce qu'on voit :** `Operation "operations/acf.p2-…" finished successfully.`
+- **À retenir :** l'API Kubernetes Engine doit être active pour que Terraform puisse créer le
+  cluster.
+- **Piège rencontré :** un premier essai a échoué avec `FAILED_PRECONDITION … The terms of
+  service 'cloud' … must be accepted` (`UREQ_TOS_NOT_ACCEPTED`) : le compte du lab n'avait
+  jamais ouvert la console Google Cloud. Solution : ouvrir `https://console.cloud.google.com`
+  avec le compte du lab (navigation privée), accepter les conditions (« Agree and continue »),
+  puis relancer la commande.
+
+---
+
+## 55 — `terraform plan`
+
+- **Fichier :** `55-terraform-plan.png` · **Date :** 2026-11-04 · **Branche :** `feat/p2-terraform-gke`
+- **Commande :** `terraform plan` (depuis `Project-2/terraform/`)
+- **Ce qu'on voit :**
+  - **`Plan: 7 to add, 0 to change, 0 to destroy.`** : le cluster, le compte de service des
+    nœuds et ses droits IAM sur le projet, et 2 ressources `random` (suffixe du compte de
+    service, choix des zones).
+  - **`Changes to Outputs`** : `cluster_location = "us-east1"` et `release_channel = "REGULAR"`
+    déjà connus ; les autres `(known after apply)` ; `cluster_endpoint = (sensitive value)`.
+  - **`Warning: Deprecated value used`** dans `.terraform/modules/gke/…/main.tf` ligne 87
+    (`addons_config.parallelstore_csi_driver_config` remplacé à terme par
+    `lustre_csi_driver_config`).
+- **À retenir :**
+  - Le plan **ne crée rien** : il montre ce que `apply` fera.
+  - L'avertissement vient du **code du module Google**, pas du nôtre. Sans effet sur la
+    création ; il disparaîtra avec une version future du module. On ne peut pas le corriger :
+    la version 46 du module est imposée (T1).
+  - La note sur `-out` : sans plan enregistré, `apply` recalcule le plan avant d'agir ; il le
+    réaffiche et demande `yes`.
+
+---
+
+## 56 — `terraform apply` : le cluster est créé
+
+- **Fichier :** `56-terraform-apply-outputs.png` · **Date :** 2026-11-04 · **Branche :** `feat/p2-terraform-gke`
+- **Commande :** `terraform apply` (réponse `yes`) — durée constatée : quelques minutes,
+  plus court que les 10-15 min annoncées.
+- **Ce qu'on voit :** `Apply complete! Resources: 7 added, 0 changed, 0 destroyed.` puis les outputs :
+
+  | Output | Valeur |
+  |---|---|
+  | `cluster_endpoint` | `<sensitive>` |
+  | `cluster_location` | `us-east1` |
+  | `cluster_name` | `autopilot-cluster-1` |
+  | `get_credentials_command` | `gcloud container clusters get-credentials autopilot-cluster-1 --location us-east1 --project <PROJECT_ID>` |
+  | `kubernetes_version` | `1.36.4-gke.2046003` |
+  | `project_id` | `<PROJECT_ID>` |
+  | `release_channel` | `REGULAR` |
+
+- **À retenir :** exigences T1 (cluster créé uniquement par le module) et T5 (outputs lus dans
+  le module, endpoint marqué sensible, commande de connexion prête à copier). Même avertissement
+  `Deprecated value used` que pour le plan : il vient du module, sans effet.
+
+---
+
+## 57 — Idempotence : `terraform plan` → `No changes`
+
+- **Fichier :** `57-terraform-plan-no-changes.png` · **Date :** 2026-11-04 · **Branche :** `feat/p2-terraform-gke`
+- **Commande :** `terraform plan`, juste après l'`apply`.
+- **Ce qu'on voit :** `Refreshing state...` sur le cluster
+  (`projects/<PROJECT_ID>/locations/us-east1/clusters/autopilot-cluster-1`), puis
+  **`No changes. Your infrastructure matches the configuration.`**
+- **À retenir :** exigence T6 : Terraform relit l'état réel du cluster chez Google, le compare au
+  code et ne trouve **aucune différence**. Aucune dérive persistante avec ce module et ces
+  arguments. C'est l'étape 1 du scénario de démonstration de la soutenance.
+
+---
+
+## 58 — `terraform output` et l'endpoint sensible
+
+- **Fichier :** `58-terraform-output.png` · **Date :** 2026-11-04 · **Branche :** `feat/p2-terraform-gke`
+- **Commandes :** `terraform output` puis `terraform output -raw cluster_endpoint`.
+- **Ce qu'on voit :** les 7 outputs relus à tout moment (sans relancer `apply`), avec
+  `cluster_endpoint = <sensitive>` ; puis `-raw` affiche la vraie valeur : l'**adresse IP
+  publique de l'API Kubernetes** du cluster.
+- **À retenir :** vérification T5 de l'énoncé : « l'endpoint apparaît comme sensible et se lit
+  avec `terraform output -raw <nom>` ». `sensitive = true` masque la valeur dans les affichages
+  (et les journaux de CI), mais elle reste **en clair dans le fichier d'état**
+  `terraform.tfstate` : une raison de plus pour ne jamais versionner le state. Étape 1 du
+  scénario de démonstration (`terraform output` affiche le nom et la région).
+
+---
+
+## 59 — `terraform state list` : ce que Terraform gère
+
+- **Fichier :** `59-terraform-state-list.png` · **Date :** 2026-11-04 · **Branche :** `feat/p2-terraform-gke`
+- **Commande :** `terraform state list`
+- **Ce qu'on voit :** 10 lignes, toutes préfixées `module.gke.` (tout vient du module) :
+
+  | Type | Lignes | Rôle |
+  |---|---|---|
+  | `data.` (3) | `google_compute_zones.available`, `google_container_engine_versions.region` / `.zone` | **Lectures seules** : informations demandées à Google (zones disponibles, versions de Kubernetes). Rien n'est créé. |
+  | Ressource (1) | `google_container_cluster.primary` | **Le cluster** `autopilot-cluster-1` |
+  | Ressource (1) | `google_service_account.cluster_service_account` | Compte de service utilisé par les nœuds |
+  | Ressources (3) | `google_project_iam_member.cluster_service_account_*` (`metric_writer`, `node_service_account`, `resource_metadata_writer`) | Droits de ce compte sur le projet : écrire des métriques, des métadonnées, agir comme nœud GKE |
+  | Ressources (2) | `random_shuffle.available_zones`, `random_string.cluster_service_account_suffix` | Tirages aléatoires internes au module (ordre des zones, suffixe du nom du compte de service) |
+
+- **À retenir :** 3 lectures + **7 ressources** = les `7 added` de l'`apply`. C'est la liste
+  exacte de ce que Terraform a créé et qu'il supprimera au `terraform destroy` (exigence T9 :
+  documenter « ce que le module crée réellement »). Les `[0]` viennent du `count` utilisé dans
+  le module (ressource optionnelle, ici créée une fois).
 
