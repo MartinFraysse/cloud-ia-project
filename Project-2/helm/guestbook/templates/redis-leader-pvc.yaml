@@ -3,6 +3,8 @@ Disque persistant du Redis leader, monté sur /data. Il survit à la suppression
 storageClassName n'est écrit QUE si redisLeader.persistence.storageClass est renseigné :
 absent = StorageClass par défaut du cluster. Écrire storageClassName: "" voudrait dire
 « aucune classe » et le PVC resterait Pending.
+Si redisLeader.persistence.keep vaut true : annotation helm.sh/resource-policy: keep →
+helm uninstall ne supprime PAS ce PVC (les messages sont conservés).
 */}}
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -10,6 +12,10 @@ metadata:
   name: {{ include "guestbook.redisLeader.pvcName" . }}
   labels:
     {{- include "guestbook.componentLabels" (dict "ctx" . "component" "redis-leader") | nindent 4 }}
+  {{- if .Values.redisLeader.persistence.keep }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   accessModes:
     - {{ .Values.redisLeader.persistence.accessMode }}

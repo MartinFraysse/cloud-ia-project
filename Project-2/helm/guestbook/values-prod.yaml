@@ -1,0 +1,21 @@
+# Surcharges de l'environnement PROD (release stack-prod, namespace prod).
+# Production : redondance des pods sans état, volume plus grand et conservé à la désinstallation.
+commonLabels:
+  environment: prod
+  team: plateforme
+frontend:
+  replicaCount: 3         # tolère la perte d'un pod / d'un nœud
+  service:
+    port: 80
+  resources:
+    requests: {cpu: 200m, memory: 256Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+redisLeader:
+  resources:
+    requests: {cpu: 200m, memory: 256Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+  persistence:
+    size: 5Gi
+    keep: true            # helm uninstall ne supprime pas les messages de prod
+redisFollower:
+  replicaCount: 2         # lectures toujours servies si un follower redémarre

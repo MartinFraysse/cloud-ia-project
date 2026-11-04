@@ -1,0 +1,9 @@
+# Surcharges de l'environnement STAGING (release stack-staging, namespace staging).
+# Pré-production : proche de prod pour valider les mises à jour dans des conditions réalistes.
+commonLabels:
+  environment: staging
+  team: plateforme
+frontend:
+  replicaCount: 2         # au moins 2 pour tester le RollingUpdate sans coupure
+  service:
+    port: 8081
