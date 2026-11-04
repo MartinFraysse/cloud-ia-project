@@ -1,0 +1,16 @@
+{#
+  Réponse de l'endpoint /health (JSON), générée dans chaque release. Interrogée par deploy.yml
+  après la bascule : "status" doit valoir "ok" et "version" la version demandée, sinon le
+  retour arrière automatique se déclenche. JSON n'ayant pas de commentaires, l'en-tête
+  ansible_managed est porté par la clé "_ansible_managed".
+#}
+{
+  "_ansible_managed": {{ ansible_managed | to_json(ensure_ascii=False) }},
+  "_source": "roles/fleetinfo/templates/health.json.j2",
+  "status": "ok",
+  "application": "fleetinfo",
+  "version": {{ fleetinfo_version | to_json }},
+  "environment": {{ fleetinfo_environment | to_json }},
+  "hostname": {{ ansible_facts.hostname | to_json }},
+  "deployed_at": {{ fleetinfo_deployed_at | to_json }}
+}

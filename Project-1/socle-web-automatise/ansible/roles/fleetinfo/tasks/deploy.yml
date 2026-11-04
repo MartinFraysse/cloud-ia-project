@@ -1,0 +1,268 @@
+---
+# Rôle fleetinfo — déploiement d'une release avec contrôle de santé et retour arrière automatique.
+#
+#   avant  : mémoriser la release active (N-1), cible d'un éventuel retour arrière ;
+#   block  : générer releases/<version>/, basculer "current", vérifier /health (statut + version) ;
+#   rescue : rebasculer "current" vers N-1, recharger nginx, revérifier /health, puis échouer
+#            explicitement avec un message clair ;
+#   always : tracer la tentative (date, hôte, versions, résultat) dans le journal de déploiement.
+#
+# Réutilisé SANS génération de fichiers (fleetinfo_render_release: false) par rollback.yml,
+# pour rebasculer vers une release déjà présente avec les mêmes garde-fous.
+
+- name: Lire la release actuellement active
+  ansible.builtin.stat:
+    path: "{{ fleetinfo_current_link }}"
+  register: fleetinfo_current_stat
+
+- name: Mémoriser la release active avant bascule (cible d'un éventuel retour arrière)
+  ansible.builtin.set_fact:
+    fleetinfo_active_dir: >-
+      {{ fleetinfo_current_stat.stat.lnk_source
+         if (fleetinfo_current_stat.stat.islnk | default(false)) else '' }}
+    fleetinfo_deploy_status: EN_COURS
+    fleetinfo_deploy_detail: ""
+
+- name: Calculer le contexte du déploiement
+  ansible.builtin.set_fact:
+    fleetinfo_active_version: "{{ fleetinfo_active_dir | basename }}"
+    # Vrai si "current" doit changer de release (nouvelle version, ou retour arrière).
+    # Faux si la release demandée est déjà active : seule une mise à jour sur place est possible.
+    fleetinfo_deploy_needed: "{{ fleetinfo_active_dir != fleetinfo_release_dir }}"
+
+- name: Dater le déploiement et identifier la release précédente
+  ansible.builtin.set_fact:
+    # Date du DERNIER déploiement : celle de cette exécution si "current" bascule, sinon la
+    # date mémorisée lors de la bascule précédente (fait local). Ne jamais prendre "maintenant"
+    # à chaque passage : la page changerait à chaque exécution (changed=0 impossible).
+    fleetinfo_deployed_at: >-
+      {{ ansible_facts.date_time.iso8601
+         if (fleetinfo_deploy_needed | bool)
+         else (ansible_local.fleetinfo.deployed_at | default(ansible_facts.date_time.iso8601)) }}
+    # Release N-1 à mémoriser et afficher (même logique : ne change qu'au moment d'une bascule).
+    fleetinfo_recorded_previous: >-
+      {{ fleetinfo_active_version
+         if (fleetinfo_deploy_needed | bool)
+         else (ansible_local.fleetinfo.previous_version | default('')) }}
+
+- name: Refuser une version imposée par -e pendant un retour arrière manuel
+  # rollback.yml fixe la cible par un paramètre d'include ; un -e fleetinfo_version (précédence
+  # plus forte) détournerait la bascule vers une release dont la présence n'a pas été vérifiée.
+  ansible.builtin.assert:
+    that:
+      - fleetinfo_deploy_kind != 'rollback-manuel' or fleetinfo_version == fleetinfo_rollback_target
+    fail_msg: >-
+      Retour arrière manuel : ne pas passer -e fleetinfo_version ({{ fleetinfo_version }}) ;
+      utiliser -e fleetinfo_rollback_version=X.Y.Z pour choisir la version cible.
+    quiet: true
+
+- name: Refuser une simulation d'échec sur la version déjà active
+  ansible.builtin.assert:
+    that:
+      - not (fleetinfo_simulate_failure | bool) or (fleetinfo_deploy_needed | bool)
+    fail_msg: >-
+      fleetinfo_simulate_failure=true exige une version DIFFÉRENTE de la version active
+      ({{ fleetinfo_active_version }}), sinon il n'existerait aucune version vers laquelle revenir.
+      Exemple : -e fleetinfo_version=1.2.0 -e fleetinfo_simulate_failure=true
+    quiet: true
+
+- name: Déployer avec retour arrière automatique la version {{ fleetinfo_version }}
+  block:
+    - name: Créer le répertoire de la release {{ fleetinfo_version }}
+      ansible.builtin.file:
+        path: "{{ fleetinfo_release_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: fleetinfo_render_release | bool
+
+    - name: Générer la page d'accueil de la release
+      ansible.builtin.template:
+        src: index.html.j2
+        dest: "{{ fleetinfo_release_dir }}/index.html"
+        owner: root
+        group: root
+        mode: "0644"
+      register: fleetinfo_page_result
+      when: fleetinfo_render_release | bool
+
+    - name: Générer la réponse du contrôle de santé de la release
+      ansible.builtin.template:
+        src: health.json.j2
+        dest: "{{ fleetinfo_release_dir }}/health.json"
+        owner: root
+        group: root
+        mode: "0644"
+      register: fleetinfo_health_file_result
+      when:
+        - fleetinfo_render_release | bool
+        - not (fleetinfo_simulate_failure | bool)
+
+    - name: "Démonstration : livrer une release incomplète (sans health.json)"
+      # Moyen documenté de provoquer un échec réaliste : nginx répondra 404 sur /health.
+      ansible.builtin.file:
+        path: "{{ fleetinfo_release_dir }}/health.json"
+        state: absent
+      register: fleetinfo_broken_result
+      when:
+        - fleetinfo_render_release | bool
+        - fleetinfo_simulate_failure | bool
+
+    - name: Basculer le lien current vers la release {{ fleetinfo_version }}
+      # Remplacement ATOMIQUE du lien (lien temporaire puis rename) : nginx sert soit
+      # l'ancienne release, soit la nouvelle, jamais un mélange des deux.
+      # Rien à recharger ensuite : nginx résout le lien "current" à chaque requête
+      # (pas d'open_file_cache dans nginx.conf), la nouvelle release est servie immédiatement.
+      ansible.builtin.file:
+        src: "{{ fleetinfo_release_dir }}"
+        dest: "{{ fleetinfo_current_link }}"
+        state: link
+        # En simulation (--check), le répertoire de la nouvelle release n'est pas réellement
+        # créé : force évite l'erreur « src does not exist » et la bascule est juste annoncée.
+        force: "{{ ansible_check_mode }}"
+      register: fleetinfo_switch_result
+
+    - name: Interroger /health jusqu'à obtenir la version {{ fleetinfo_version }}
+      ansible.builtin.uri:
+        url: "{{ fleetinfo_health_url }}"
+        return_content: true
+      register: fleetinfo_health_result
+      until:
+        - fleetinfo_health_result.status == 200
+        - fleetinfo_health_result.json is defined
+        - fleetinfo_health_result.json.version | default('') == fleetinfo_version
+      retries: "{{ fleetinfo_health_retries }}"
+      delay: "{{ fleetinfo_health_delay }}"
+      # En simulation (--check), rien n'a réellement basculé : il n'y a rien à vérifier.
+      when: not ansible_check_mode
+
+    - name: Contrôler le statut et la version renvoyés par /health
+      ansible.builtin.assert:
+        that:
+          - fleetinfo_health_result.json.status == 'ok'
+          - fleetinfo_health_result.json.version == fleetinfo_version
+        fail_msg: >-
+          /health répond {{ fleetinfo_health_result.json | default('?') }} au lieu de
+          status=ok et version={{ fleetinfo_version }}.
+        quiet: true
+      when: not ansible_check_mode
+
+    - name: Mémoriser la release active dans les facts locaux
+      ansible.builtin.template:
+        src: fleetinfo.fact.j2
+        dest: "{{ fleetinfo_fact_file }}"
+        owner: root
+        group: root
+        mode: "0644"
+      register: fleetinfo_fact_result
+
+    - name: Marquer le déploiement comme réussi
+      ansible.builtin.set_fact:
+        fleetinfo_deploy_status: SUCCES
+
+  rescue:
+    - name: Mémoriser la cause de l'échec
+      ansible.builtin.set_fact:
+        # Statut provisoire : remplacé par ECHEC_ROLLBACK_OK une fois le retour arrière vérifié.
+        fleetinfo_deploy_status: >-
+          {{ 'ECHEC_ROLLBACK_KO' if (fleetinfo_rollback_possible | bool) else 'ECHEC_SANS_ROLLBACK' }}
+        fleetinfo_deploy_detail: >-
+          {{ (ansible_failed_task.name | default('?')) ~ ' : '
+             ~ (ansible_failed_result.msg | default('erreur inconnue') | string) }}
+      vars:
+        fleetinfo_rollback_possible: "{{ fleetinfo_active_dir | length > 0 and fleetinfo_active_dir != fleetinfo_release_dir }}"
+
+    - name: Rebasculer current vers la release précédente {{ fleetinfo_active_version }}
+      ansible.builtin.file:
+        src: "{{ fleetinfo_active_dir }}"
+        dest: "{{ fleetinfo_current_link }}"
+        state: link
+      when: fleetinfo_deploy_status == 'ECHEC_ROLLBACK_KO'
+
+    - name: Recharger le service web
+      # Par prudence : remet nginx dans un état sain (il est démarré s'il était arrêté).
+      ansible.builtin.service:
+        name: "{{ fleetinfo_web_service }}"
+        state: reloaded
+
+    - name: Confirmer le retour arrière par le contrôle de santé
+      when:
+        - fleetinfo_deploy_status == 'ECHEC_ROLLBACK_KO'
+        - not ansible_check_mode
+      block:
+        - name: Vérifier que /health répond de nouveau avec la version {{ fleetinfo_active_version }}
+          ansible.builtin.uri:
+            url: "{{ fleetinfo_health_url }}"
+            return_content: true
+          register: fleetinfo_rollback_health_result
+          until:
+            - fleetinfo_rollback_health_result.status == 200
+            - fleetinfo_rollback_health_result.json is defined
+            - fleetinfo_rollback_health_result.json.version | default('') == fleetinfo_active_version
+          retries: "{{ fleetinfo_health_retries }}"
+          delay: "{{ fleetinfo_health_delay }}"
+
+        - name: Mémoriser le succès du retour arrière
+          ansible.builtin.set_fact:
+            fleetinfo_deploy_status: ECHEC_ROLLBACK_OK
+
+      rescue:
+        # Le retour arrière lui-même n'est pas confirmé : on ne s'arrête pas ici, pour que la
+        # tâche suivante produise un message explicite (statut ECHEC_ROLLBACK_KO conservé).
+        - name: Mémoriser l'échec de la vérification du retour arrière
+          ansible.builtin.set_fact:
+            fleetinfo_deploy_detail: >-
+              {{ fleetinfo_deploy_detail ~ ' / retour arrière non confirmé : '
+                 ~ (ansible_failed_result.msg | default('erreur inconnue') | string) }}
+
+    - name: Faire échouer explicitement le déploiement
+      ansible.builtin.fail:
+        msg: >-
+          ÉCHEC du déploiement de Fleet Info {{ fleetinfo_version }} sur {{ inventory_hostname }}.
+          {{ fleetinfo_rollback_summary[fleetinfo_deploy_status] }}
+          Cause : {{ fleetinfo_deploy_detail }}.
+          Journal : {{ fleetinfo_deploy_log }}.
+      vars:
+        fleetinfo_rollback_summary:
+          ECHEC_ROLLBACK_OK: >-
+            Retour arrière effectué : la version {{ fleetinfo_active_version }} est de nouveau
+            active et répond sur /health.
+          ECHEC_ROLLBACK_KO: >-
+            Retour arrière vers la version {{ fleetinfo_active_version }} effectué mais NON confirmé :
+            /health ne répond pas avec cette version. INTERVENTION MANUELLE requise
+            (docs/troubleshooting.md).
+          ECHEC_SANS_ROLLBACK: >-
+            Aucune version précédente vers laquelle revenir (premier déploiement ou mise à jour
+            sur place de la release active) : le lien current reste sur la release demandée.
+
+  always:
+    - name: Tracer la tentative de déploiement dans le journal
+      ansible.builtin.lineinfile:
+        path: "{{ fleetinfo_deploy_log }}"
+        line: >-
+          {{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}
+          hote={{ inventory_hostname }}
+          type={{ fleetinfo_deploy_kind if (fleetinfo_deploy_needed | bool) else 'mise-a-jour-sur-place' }}
+          demandee={{ fleetinfo_version }}
+          precedente={{ fleetinfo_active_version | default('', true) or 'aucune' }}
+          resultat={{ fleetinfo_deploy_status }}{{ fleetinfo_log_detail }}
+        create: true
+        insertafter: EOF
+        owner: root
+        group: "{{ fleetinfo_log_group }}"
+        mode: "0640"
+      # Une ligne par TENTATIVE réelle : une exécution sur un serveur déjà conforme (rien de
+      # généré, rien de basculé, aucun échec) n'est pas une tentative et ne touche pas au
+      # journal. C'est ce qui garantit changed=0 au second passage.
+      when: >-
+        fleetinfo_deploy_status != 'SUCCES'
+        or (fleetinfo_page_result | default({})) is changed
+        or (fleetinfo_health_file_result | default({})) is changed
+        or (fleetinfo_broken_result | default({})) is changed
+        or (fleetinfo_switch_result | default({})) is changed
+      vars:
+        # Cause de l'échec sur une seule ligne, sans guillemets doubles (format clé="valeur").
+        fleetinfo_log_detail: >-
+          {{ (' detail="' ~ (fleetinfo_deploy_detail | regex_replace('\s+', ' ') | replace('"', "'") | truncate(300)) ~ '"')
+             if fleetinfo_deploy_detail | length > 0 else '' }}

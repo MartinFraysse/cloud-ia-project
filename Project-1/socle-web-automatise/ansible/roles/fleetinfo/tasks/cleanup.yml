@@ -1,0 +1,29 @@
+---
+# Rôle fleetinfo — ménage : ne conserve que les fleetinfo_keep_releases releases les plus
+# récentes (date de modification du répertoire). La release active et la release précédente
+# (cible d'un retour arrière) sont TOUJOURS protégées. Idempotent : rien n'est supprimé tant
+# que le nombre de releases ne dépasse pas la limite.
+
+- name: Lister les releases présentes sur le serveur
+  ansible.builtin.find:
+    paths: "{{ fleetinfo_releases_dir }}"
+    file_type: directory
+  register: fleetinfo_releases_found
+
+- name: Supprimer les releases les plus anciennes au-delà de la limite de {{ fleetinfo_keep_releases }}
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ fleetinfo_releases_to_delete }}"
+  loop_control:
+    label: "{{ item | basename }}"
+  vars:
+    fleetinfo_protected_releases:
+      - "{{ fleetinfo_release_dir }}"
+      - "{{ fleetinfo_releases_dir }}/{{ fleetinfo_recorded_previous | default('', true) }}"
+    fleetinfo_sorted_releases: >-
+      {{ fleetinfo_releases_found.files | sort(attribute='mtime') | map(attribute='path') | list }}
+    fleetinfo_excess_count: >-
+      {{ [0, (fleetinfo_sorted_releases | length) - (fleetinfo_keep_releases | int)] | max }}
+    fleetinfo_releases_to_delete: >-
+      {{ (fleetinfo_sorted_releases | reject('in', fleetinfo_protected_releases) | list)[: fleetinfo_excess_count | int] }}

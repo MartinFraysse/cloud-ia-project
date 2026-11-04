@@ -1,0 +1,26 @@
+---
+# rollback.yml — RETOUR ARRIÈRE MANUEL de Fleet Info, en urgence, sans modifier le dépôt.
+#
+# Rebascule le lien "current" vers une release DÉJÀ présente sur le serveur (sans la
+# régénérer), vérifie /health puis trace l'opération dans /var/log/fleetinfo/deploy.log.
+#   release précédente (mémorisée lors du dernier déploiement) :
+#     ansible-playbook rollback.yml                    [-i inventories/cloud/fleet.gcp.yml]
+#   version précise :
+#     ansible-playbook rollback.yml -e fleetinfo_rollback_version=1.0.0
+#
+# Ensuite, aligner fleetinfo_version dans group_vars/all/vars.yml sur la version restaurée :
+# sinon le prochain site.yml redéploierait la version que l'on vient de quitter.
+# Rangé à côté de site.yml pour charger les mêmes group_vars (dont le coffre Vault).
+
+- name: Revenir à une version précédente de Fleet Info
+  hosts: web
+  become: true
+  serial:
+    - 1
+    - "100%"
+  max_fail_percentage: 0
+  tasks:
+    - name: Rebasculer vers la release cible
+      ansible.builtin.include_role:
+        name: fleetinfo
+        tasks_from: rollback

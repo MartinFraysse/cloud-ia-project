@@ -1,0 +1,10 @@
+---
+# Rôle fleetinfo — handlers.
+# Aucun handler, volontairement :
+#   - la bascule de release est un simple changement du lien "current", que nginx résout à
+#     chaque requête : aucun rechargement n'est nécessaire pour servir la nouvelle version ;
+#   - le seul rechargement du rôle (rescue de tasks/deploy.yml) doit avoir lieu
+#     IMMÉDIATEMENT, avant de revérifier /health : un handler, exécuté en fin de play,
+#     arriverait trop tard.
+# Le fichier est conservé pour respecter l'arborescence standard d'un rôle.
+[]

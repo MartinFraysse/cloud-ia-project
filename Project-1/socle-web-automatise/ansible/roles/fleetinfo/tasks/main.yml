@@ -1,0 +1,25 @@
+---
+# Rôle fleetinfo — point d'entrée : déploiement versionné de Fleet Info.
+#   1. contrôles d'entrée (types validés au préalable par meta/argument_specs.yml) ;
+#   2. arborescence /opt/fleetinfo/{releases,current} et journal ;
+#   3. déploiement block/rescue/always : génération de la release, bascule, /health, rollback ;
+#   4. ménage des anciennes releases.
+# Pas de "become" ici : l'élévation est déclarée par le play (site.yml).
+
+- name: Vérifier le format de la version demandée
+  ansible.builtin.assert:
+    that:
+      - fleetinfo_version is match(fleetinfo_version_pattern)
+    fail_msg: >-
+      fleetinfo_version="{{ fleetinfo_version }}" n'est pas une version X.Y.Z valide
+      (à corriger dans group_vars/all/vars.yml ou dans le -e de la commande).
+    quiet: true
+
+- name: Préparer l'arborescence de l'application
+  ansible.builtin.import_tasks: prepare.yml
+
+- name: Déployer la release demandée
+  ansible.builtin.import_tasks: deploy.yml
+
+- name: Supprimer les releases les plus anciennes
+  ansible.builtin.import_tasks: cleanup.yml

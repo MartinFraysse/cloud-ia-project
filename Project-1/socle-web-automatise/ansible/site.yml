@@ -1,18 +1,44 @@
 ---
-# Rôle : point d'entrée unique. Orchestre les rôles sur le groupe "web".
-# Identique en local et sur le cloud : seul l'inventaire (-i) change.
-- name: Vérifier la connectivité des serveurs web
-  hosts: web
-  gather_facts: false
-  tasks:
-    - name: Tester la connexion SSH et la présence de Python
-      ansible.builtin.ping:
+# site.yml — POINT D'ENTRÉE UNIQUE du socle : configure les serveurs du groupe "web" et y
+# déploie Fleet Info. Strictement identique en local et sur le cloud : seul l'inventaire change.
+#   local : ansible-playbook site.yml                                  (inventaire par défaut)
+#   cloud : ansible-playbook -i inventories/cloud/fleet.gcp.yml site.yml
+#
+# Trois plays courts, un par couche ; toute la logique est dans les rôles.
+# Un play par couche a un effet voulu : les handlers d'un play (validation puis rechargement
+# de nginx) s'exécutent à la fin de CE play, donc AVANT le déploiement applicatif qui suit.
+#
+# Tags : common, webserver, fleetinfo
+#   ex. ne livrer que l'application : ansible-playbook site.yml --tags fleetinfo
+#
+# Les plays sont écrits ici plutôt qu'importés depuis un dossier playbooks/ : Ansible ne
+# charge les group_vars de playbook (group_vars/all/, dont le coffre Vault) que pour les
+# playbooks situés dans le même dossier qu'eux (cf. docs/decisions.md, ADR-09).
 
-- name: Configurer les serveurs web du socle
+- name: Appliquer le socle système commun
   hosts: web
   become: true
   roles:
     - role: common
       tags: [common]
+
+- name: Configurer le serveur web nginx
+  hosts: web
+  become: true
+  roles:
     - role: webserver
       tags: [webserver]
+
+# Déploiement « canari » : un premier serveur seul, puis tous les autres ensemble.
+# max_fail_percentage: 0 arrête tout au premier échec : si le canari échoue (et revient
+# automatiquement à N-1), les autres serveurs ne reçoivent jamais la version défectueuse.
+- name: Déployer l'application Fleet Info
+  hosts: web
+  become: true
+  serial:
+    - 1
+    - "100%"
+  max_fail_percentage: 0
+  roles:
+    - role: fleetinfo
+      tags: [fleetinfo]

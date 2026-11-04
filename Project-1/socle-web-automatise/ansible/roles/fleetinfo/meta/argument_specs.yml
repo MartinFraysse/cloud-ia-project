@@ -1,0 +1,92 @@
+---
+# Rôle fleetinfo — spécification des variables d'entrée, validée automatiquement par Ansible
+# avant la première tâche de chaque point d'entrée (main, rollback).
+# Les valeurs "default" documentent defaults/main.yml (qui reste la référence).
+argument_specs:
+  main:
+    short_description: Déploie une release de Fleet Info avec contrôle de santé et retour arrière
+    description:
+      - Génère releases/<version>/ à partir des facts, bascule atomiquement le lien current,
+        vérifie /health et revient automatiquement à la release précédente en cas d'échec.
+      - Chaque tentative est tracée dans fleetinfo_deploy_log.
+    author: Équipe Plateforme NovaRetail
+    options: &fleetinfo_common_options
+      fleetinfo_version:
+        type: str
+        default: "1.0.0"
+        description: Version à déployer (X.Y.Z). Référence du socle dans group_vars/all/vars.yml.
+      fleetinfo_base_dir:
+        type: path
+        default: /opt/fleetinfo
+        description: Racine de l'application (releases/ et lien current).
+      fleetinfo_keep_releases:
+        type: int
+        default: 3
+        description: Nombre de releases conservées (active et précédente toujours protégées).
+      fleetinfo_environment:
+        type: str
+        default: "{{ socle_env | default('inconnu') }}"
+        description: Environnement affiché sur la page (local / cloud).
+      fleetinfo_cloud_zone:
+        type: str
+        default: ""
+        description: Zone GCP affichée (vide = section Cloud masquée).
+      fleetinfo_cloud_machine_type:
+        type: str
+        default: ""
+        description: Type de machine GCP affiché (vide = non affiché).
+      fleetinfo_cloud_public_ip:
+        type: str
+        default: ""
+        description: IP publique affichée (vide = non affichée).
+      fleetinfo_release_notes:
+        type: dict
+        description: Notes de version affichées sur la page, par numéro de version.
+      fleetinfo_health_host:
+        type: str
+        default: 127.0.0.1
+        description: Hôte interrogé par le contrôle de santé (depuis le serveur lui-même).
+      fleetinfo_health_port:
+        type: int
+        default: 80
+        description: Port interrogé par le contrôle de santé.
+      fleetinfo_health_path:
+        type: str
+        default: /health
+        description: Chemin du contrôle de santé.
+      fleetinfo_health_retries:
+        type: int
+        default: 5
+        description: Nouvelles tentatives du contrôle de santé après le premier appel (5 => 6 appels au total).
+      fleetinfo_health_delay:
+        type: int
+        default: 2
+        description: Délai (s) entre deux essais du contrôle de santé.
+      fleetinfo_web_service:
+        type: str
+        default: nginx
+        description: Service web rechargé lors d'un retour arrière.
+      fleetinfo_deploy_log:
+        type: path
+        default: /var/log/fleetinfo/deploy.log
+        description: Journal des tentatives de déploiement.
+      fleetinfo_log_group:
+        type: str
+        default: adm
+        description: Groupe propriétaire du journal (lecture par le compte d'exploitation).
+      fleetinfo_simulate_failure:
+        type: bool
+        default: false
+        description: Démonstration — livre une release sans health.json pour provoquer le retour arrière.
+  rollback:
+    short_description: Retour arrière manuel vers une release déjà présente sur le serveur
+    description:
+      - Rebascule current vers la release précédente mémorisée (ou fleetinfo_rollback_version),
+        sans la régénérer, puis vérifie /health et trace l'opération.
+    author: Équipe Plateforme NovaRetail
+    options:
+      <<: *fleetinfo_common_options
+      fleetinfo_rollback_version:
+        type: str
+        default: ""
+        description: Version cible ; vide = release précédente mémorisée dans le fait local.

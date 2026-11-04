@@ -1,0 +1,24 @@
+---
+# Rôle fleetinfo — constantes internes (précédence forte, non destinées à être surchargées).
+# Les chemins dérivent de fleetinfo_base_dir et fleetinfo_version (évalués à l'usage).
+
+# Arborescence d'une installation
+fleetinfo_releases_dir: "{{ fleetinfo_base_dir }}/releases"
+fleetinfo_current_link: "{{ fleetinfo_base_dir }}/current"
+fleetinfo_release_dir: "{{ fleetinfo_releases_dir }}/{{ fleetinfo_version }}"
+
+# Fait local Ansible : mémorise la release active, la précédente et la date de déploiement.
+# Relu automatiquement à chaque collecte des facts (ansible_local.fleetinfo).
+fleetinfo_fact_dir: /etc/ansible/facts.d
+fleetinfo_fact_file: "{{ fleetinfo_fact_dir }}/fleetinfo.fact"
+
+# URL du contrôle de santé
+fleetinfo_health_url: "http://{{ fleetinfo_health_host }}:{{ fleetinfo_health_port }}{{ fleetinfo_health_path }}"
+
+# Mode du déploiement (tasks/deploy.yml). rollback.yml les surcharge par des paramètres
+# d'include (précédence supérieure) pour rebasculer SANS régénérer la release.
+fleetinfo_render_release: true        # générer les fichiers de la release avant la bascule
+fleetinfo_deploy_kind: deploiement    # type d'opération écrit dans le journal
+
+# Format accepté pour une version (versionnage sémantique simple)
+fleetinfo_version_pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'

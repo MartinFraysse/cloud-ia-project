@@ -1,0 +1,135 @@
+<!-- {{ ansible_managed }} -->
+<!-- Source : roles/fleetinfo/templates/index.html.j2 (rôle fleetinfo, release {{ fleetinfo_version }}) -->
+{#
+  Page d'accueil de Fleet Info, générée à partir des facts du serveur et des variables du socle.
+  Règle d'idempotence : n'afficher que des valeurs STABLES d'une exécution à l'autre
+  (pas d'heure courante, de charge, d'uptime ni d'espace libre), sinon la page changerait
+  à chaque passage et "changed=0" serait impossible.
+#}
+{% set f = ansible_facts %}
+{% set is_cloud = (fleetinfo_cloud_zone | length > 0) or (fleetinfo_cloud_machine_type | length > 0) %}
+{% set root_mount = f.mounts | default([]) | selectattr('mount', 'equalto', '/') | first | default({}) %}
+{% set notes = fleetinfo_release_notes[fleetinfo_version] | default('') %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fleet Info · {{ f.hostname }} · v{{ fleetinfo_version }}</title>
+  <style>
+    :root {
+      --bg: #f4f6f9; --card: #ffffff; --text: #1d2433; --muted: #5b6577; --line: #e3e7ee;
+      --accent: {{ '#1a73e8' if is_cloud else '#0f8b6f' }};
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--text); line-height: 1.45; }
+    header { background: var(--accent); color: #fff; padding: 28px 16px; }
+    header .wrap, main { max-width: 1040px; margin: 0 auto; }
+    header h1 { margin: 0 0 6px; font-size: 1.9rem; word-break: break-all; }
+    header p { margin: 0; opacity: .9; }
+    .badges { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .badge { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35);
+             border-radius: 999px; padding: 3px 12px; font-size: .85rem; font-weight: 600; }
+    main { padding: 20px 16px 40px; display: grid; gap: 16px;
+           grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+    h2 { margin: 0 0 10px; font-size: 1rem; text-transform: uppercase; letter-spacing: .04em; color: var(--accent); }
+    dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-weight: 600; word-break: break-word; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em; }
+    footer { max-width: 1040px; margin: 0 auto; padding: 0 16px 32px; color: var(--muted); font-size: .85rem; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>{{ f.hostname }}</h1>
+      <p>{{ f.fqdn | default(f.hostname) }}</p>
+      <div class="badges">
+        <span class="badge">Environnement : {{ fleetinfo_environment }}</span>
+        <span class="badge">Fleet Info v{{ fleetinfo_version }}</span>
+        <span class="badge">{{ f.distribution }} {{ f.distribution_version }}</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Identité</h2>
+      <dl>
+        <dt>Nom d'hôte</dt><dd>{{ f.hostname }}</dd>
+        <dt>FQDN</dt><dd>{{ f.fqdn | default('non défini') }}</dd>
+        <dt>IP principale</dt><dd>{{ f.default_ipv4.address | default('non définie') }}</dd>
+        <dt>Adresses IPv4</dt><dd>{{ f.all_ipv4_addresses | default([]) | sort | join(', ') or 'aucune' }}</dd>
+{% if fleetinfo_cloud_public_ip | length > 0 %}
+        <dt>IP publique</dt><dd>{{ fleetinfo_cloud_public_ip }}</dd>
+{% endif %}
+        <dt>Groupes Ansible</dt><dd>{{ group_names | sort | join(', ') }}</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>Système</h2>
+      <dl>
+        <dt>Distribution</dt><dd>{{ f.distribution }} {{ f.distribution_version }} ({{ f.distribution_release }})</dd>
+        <dt>Noyau</dt><dd>{{ f.kernel }}</dd>
+        <dt>Architecture</dt><dd>{{ f.architecture }}</dd>
+        <dt>Virtualisation</dt><dd>{{ f.virtualization_type | default('inconnue') }} ({{ f.virtualization_role | default('?') }})</dd>
+        <dt>Gestionnaire de services</dt><dd>{{ f.service_mgr | default('inconnu') }}</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>Ressources</h2>
+      <dl>
+        <dt>vCPU</dt><dd>{{ f.processor_vcpus | default('?') }}</dd>
+        <dt>Mémoire totale</dt><dd>{{ ((f.memtotal_mb | int) * 1048576) | human_readable }}</dd>
+{% if (f.swaptotal_mb | default(0) | int) > 0 %}
+        <dt>Swap</dt><dd>{{ ((f.swaptotal_mb | int) * 1048576) | human_readable }}</dd>
+{% endif %}
+{% if root_mount.size_total is defined %}
+        <dt>Disque racine</dt><dd>{{ root_mount.size_total | human_readable }} ({{ root_mount.fstype | default('?') }})</dd>
+{% endif %}
+      </dl>
+    </section>
+
+{% if is_cloud %}
+    <section>
+      <h2>Cloud · Google Compute Engine</h2>
+      <dl>
+{% if fleetinfo_cloud_zone | length > 0 %}
+        <dt>Zone</dt><dd>{{ fleetinfo_cloud_zone }}</dd>
+{% endif %}
+{% if fleetinfo_cloud_machine_type | length > 0 %}
+        <dt>Type de machine</dt><dd>{{ fleetinfo_cloud_machine_type }}</dd>
+{% endif %}
+      </dl>
+    </section>
+{% endif %}
+
+    <section>
+      <h2>Déploiement</h2>
+      <dl>
+        <dt>Version</dt><dd>{{ fleetinfo_version }}</dd>
+        <dt>Dernier déploiement</dt><dd>{{ fleetinfo_deployed_at | regex_replace('T', ' ') | regex_replace('Z$', ' UTC') }}</dd>
+{% if fleetinfo_recorded_previous | length > 0 %}
+        <dt>Version précédente</dt><dd>{{ fleetinfo_recorded_previous }}</dd>
+{% endif %}
+        <dt>Release</dt><dd><code>{{ fleetinfo_release_dir }}</code></dd>
+{% if notes | length > 0 %}
+        <dt>Notes de version</dt><dd>{{ notes }}</dd>
+{% endif %}
+      </dl>
+    </section>
+  </main>
+
+  <footer>
+    Endpoints : <a href="/health">/health</a> (contrôle de santé, JSON) ·
+    <a href="/status">/status</a> (statut nginx, authentification requise).<br>
+    Page générée par Ansible (rôle fleetinfo) à partir des facts de {{ inventory_hostname }} — ne pas modifier sur le serveur.
+  </footer>
+</body>
+</html>

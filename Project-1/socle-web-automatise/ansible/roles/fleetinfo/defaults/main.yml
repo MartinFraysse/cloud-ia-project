@@ -1,0 +1,61 @@
+---
+# Rôle fleetinfo — valeurs par défaut (précédence la plus faible, surchargeables).
+# Préfixe "fleetinfo_". Tableau récapitulatif : roles/fleetinfo/README.md.
+
+# --- Release ---------------------------------------------------------------------------
+# Version à déployer (format X.Y.Z). Valeur de secours : la valeur de référence du socle est
+# fixée UNE fois dans group_vars/all/vars.yml.
+fleetinfo_version: "1.0.0"
+
+# Racine de l'application : releases/<version>/ + lien "current" vers la release active.
+fleetinfo_base_dir: /opt/fleetinfo
+
+# Nombre de releases conservées sur disque. La release active et la précédente ne sont
+# jamais supprimées, quel que soit ce nombre.
+fleetinfo_keep_releases: 3
+
+# --- Contenu de la page ------------------------------------------------------------------
+# Environnement affiché (local / cloud), fourni par les group_vars de chaque inventaire.
+fleetinfo_environment: "{{ socle_env | default('inconnu') }}"
+
+# Informations propres au cloud, renseignées par inventories/cloud/group_vars/all.yml.
+# Vides par défaut : la section « Cloud » de la page est alors simplement absente (local).
+fleetinfo_cloud_zone: ""
+fleetinfo_cloud_machine_type: ""
+fleetinfo_cloud_public_ip: ""
+
+# Notes de version affichées sur la page, par version. Une version absente de ce catalogue
+# reste déployable : la section « Notes de version » est simplement omise. À compléter (ici
+# ou dans group_vars/all/vars.yml) en même temps que l'on livre une nouvelle version.
+fleetinfo_release_notes:
+  "1.0.0": "Version initiale du socle : page d'information serveur et contrôle de santé /health."
+  "1.1.0": "Mise à jour applicative (démonstration du déploiement d'une nouvelle version)."
+  "1.2.0": "Release de démonstration du retour arrière (échec simulé, puis déploiement sain)."
+
+# --- Contrôle de santé après bascule -------------------------------------------------------
+# Interrogé DEPUIS le serveur lui-même (127.0.0.1), à travers nginx.
+fleetinfo_health_host: 127.0.0.1
+fleetinfo_health_port: 80
+fleetinfo_health_path: /health
+fleetinfo_health_retries: 5     # nouvelles tentatives après le 1er appel (5 => 6 appels, ~10 s)
+fleetinfo_health_delay: 2       # secondes entre deux essais
+
+# Service web rechargé lors d'un retour arrière automatique.
+fleetinfo_web_service: nginx
+
+# --- Journal des déploiements ------------------------------------------------------------
+# Une ligne par tentative (date, hôte, version demandée/précédente, résultat).
+fleetinfo_deploy_log: /var/log/fleetinfo/deploy.log
+# Groupe propriétaire du journal : "adm" permet au compte d'exploitation (rôle common) de le lire.
+fleetinfo_log_group: adm
+
+# --- Démonstration -------------------------------------------------------------------------
+# true : la release produite est volontairement INCOMPLÈTE (pas de health.json), le contrôle
+# de santé échoue et le retour arrière automatique se déclenche. À passer uniquement en
+# ligne de commande, avec une version différente de la version active :
+#   ansible-playbook site.yml --tags fleetinfo -e fleetinfo_version=1.2.0 -e fleetinfo_simulate_failure=true
+fleetinfo_simulate_failure: false
+
+# --- Retour arrière manuel (rollback.yml) --------------------------------------------------
+# Version cible ; vide = release précédente, mémorisée lors du dernier déploiement réussi.
+fleetinfo_rollback_version: ""

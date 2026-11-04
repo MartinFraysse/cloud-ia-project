@@ -1,0 +1,54 @@
+---
+# Rôle fleetinfo — RETOUR ARRIÈRE MANUEL (point d'entrée appelé par le playbook rollback.yml).
+# Rebascule "current" vers une release DÉJÀ présente sur le serveur, sans la régénérer
+# (fichiers servis tels qu'ils ont été déployés), en réutilisant deploy.yml : même contrôle
+# de santé, même rescue en cas d'échec, même journal.
+
+- name: Déterminer la version cible du retour arrière
+  ansible.builtin.set_fact:
+    fleetinfo_rollback_target: >-
+      {{ fleetinfo_rollback_version
+         if (fleetinfo_rollback_version | length > 0)
+         else (ansible_local.fleetinfo.previous_version | default('')) }}
+
+- name: Vérifier qu'une version cible valide est connue
+  ansible.builtin.assert:
+    that:
+      - fleetinfo_rollback_target | length > 0
+      - fleetinfo_rollback_target is match(fleetinfo_version_pattern)
+    fail_msg: >-
+      Aucune version précédente valide n'est mémorisée sur {{ inventory_hostname }}
+      ("{{ fleetinfo_rollback_target }}") : préciser la cible avec
+      -e fleetinfo_rollback_version=X.Y.Z
+    quiet: true
+
+- name: Lister les releases présentes sur le serveur
+  ansible.builtin.find:
+    paths: "{{ fleetinfo_releases_dir }}"
+    file_type: directory
+  register: fleetinfo_available_releases
+
+- name: Vérifier la présence de la release complète {{ fleetinfo_rollback_target }}
+  ansible.builtin.stat:
+    path: "{{ fleetinfo_releases_dir }}/{{ fleetinfo_rollback_target }}/health.json"
+  register: fleetinfo_rollback_target_stat
+
+- name: Refuser un retour arrière vers une release absente ou incomplète
+  ansible.builtin.assert:
+    that:
+      - fleetinfo_rollback_target_stat.stat.exists
+    fail_msg: >-
+      La release {{ fleetinfo_rollback_target }} est absente ou incomplète (pas de health.json)
+      dans {{ fleetinfo_releases_dir }}. Releases présentes :
+      {{ fleetinfo_available_releases.files | map(attribute='path') | map('basename') | sort | join(', ') }}.
+    quiet: true
+
+- name: Préparer l'arborescence de l'application
+  ansible.builtin.import_tasks: prepare.yml
+
+- name: Rebasculer sans régénération vers la release {{ fleetinfo_rollback_target }}
+  ansible.builtin.include_tasks: deploy.yml
+  vars:
+    fleetinfo_version: "{{ fleetinfo_rollback_target }}"
+    fleetinfo_render_release: false
+    fleetinfo_deploy_kind: rollback-manuel

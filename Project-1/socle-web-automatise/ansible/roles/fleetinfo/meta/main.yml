@@ -1,0 +1,22 @@
+---
+# Rôle fleetinfo — métadonnées. Rôle écrit par l'équipe (aucun rôle public autorisé ici).
+# Aucune dépendance déclarée : il suppose seulement qu'un serveur web sert
+# fleetinfo_base_dir/current sur fleetinfo_health_port (rôle webserver, joué avant lui par site.yml).
+# Pas de dépendance meta sur webserver : chaque rôle reste lisible et rejouable seul, et
+# l'ordre des couches est porté par site.yml (un play par couche).
+# Validation des variables d'entrée : meta/argument_specs.yml.
+galaxy_info:
+  role_name: fleetinfo
+  namespace: novaretail
+  author: "Équipe Plateforme NovaRetail"
+  description: "Déploiement versionné de Fleet Info : releases, bascule atomique, contrôle de santé, rollback"
+  license: MIT
+  min_ansible_version: "2.17"
+  platforms:
+    - name: Debian
+      versions:
+        - bookworm
+  galaxy_tags:
+    - deployment
+    - rollback
+dependencies: []

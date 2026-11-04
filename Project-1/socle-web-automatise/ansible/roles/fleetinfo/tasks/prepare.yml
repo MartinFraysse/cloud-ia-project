@@ -1,0 +1,23 @@
+---
+# Rôle fleetinfo — arborescence de l'application, du journal et des facts locaux.
+# Commun au déploiement (main.yml) et au retour arrière manuel (rollback.yml).
+
+- name: Créer les répertoires de l'application
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ fleetinfo_base_dir }}"
+    - "{{ fleetinfo_releases_dir }}"
+    - "{{ fleetinfo_fact_dir }}"
+
+- name: Créer le répertoire du journal de déploiement
+  ansible.builtin.file:
+    path: "{{ fleetinfo_deploy_log | dirname }}"
+    state: directory
+    owner: root
+    group: "{{ fleetinfo_log_group }}"
+    mode: "0750"   # lisible par le groupe adm (compte d'exploitation), pas par les autres
