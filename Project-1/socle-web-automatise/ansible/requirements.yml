@@ -1,14 +1,23 @@
 ---
-# Rôle : dépendances Galaxy du projet, versions ÉPINGLÉES (reproductibilité).
-# Installation : cd ansible && ansible-galaxy install -r requirements.yml
+# requirements.yml — dépendances Ansible Galaxy du socle, versions ÉPINGLÉES (reproductibilité).
+#
+# Installation, en une commande, depuis le dossier ansible/ (dans le controller) :
+#   ansible-galaxy install -r requirements.yml
+# -> collections dans ansible/collections/, rôles dans ansible/roles/ (ignorés par Git).
+#
+# Compatibilité vérifiée avec ansible-core 2.17 (cf. local/controller/requirements.txt).
+# Justification du rôle public : docs/decisions.md (ADR-04).
+
 roles:
-  # Installation + nginx.conf. Justification dans docs/ (licence MIT, Debian supporté,
-  # nginx.conf validé par nginx -t ; les vhosts sont gérés par notre rôle "nginx").
+  # Installation de nginx + nginx.conf validé par "nginx -t" (licence MIT, Debian supporté).
+  # Le site Fleet Info et la page /status sont gérés par NOTRE rôle "webserver".
   - name: geerlingguy.nginx
     version: "3.3.1"
 
 collections:
-  - name: google.cloud          # inventaire dynamique gcp_compute (étape cloud)
-    version: "1.4.1"            # ← version affichée par la commande ci-dessus
-  - name: community.general     # timezone (rôle common)
-    version: "9.5.2"
+  # Plugin d'inventaire dynamique google.cloud.gcp_compute (environnement cloud).
+  - name: google.cloud
+    version: "1.15.0"
+  # Modules timezone (rôle common) et htpasswd (rôle webserver).
+  - name: community.general
+    version: "12.6.7"

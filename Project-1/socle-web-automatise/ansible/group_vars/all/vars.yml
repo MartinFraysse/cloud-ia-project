@@ -1,9 +1,38 @@
 ---
-# Rôle : variables COMMUNES aux deux environnements (local et cloud).
-# Les secrets sont dans vault.yml (étape 4) et référencés ici en clair.
+# group_vars/all/vars.yml — variables COMMUNES aux deux environnements (local et cloud).
+#
+# Rangé à côté de site.yml (group_vars « de playbook ») : chargé quel que soit l'inventaire.
+# Précédence : écrase les defaults des rôles et les group_vars d'inventaire (all), mais pas
+# les variables d'hôte ni les extra-vars (-e).
+# Les secrets sont dans vault.yml (chiffré) et seulement RÉFÉRENCÉS ici par leur nom, pour
+# que chaque variable reste lisible sans déchiffrer le coffre.
 
-# Version de l'application à déployer : LE seul endroit à modifier pour livrer une version
+# --- Application ---------------------------------------------------------------------------
+# Version de Fleet Info à déployer : LE SEUL endroit à modifier pour livrer une version
+# (runbook « Déployer une nouvelle version »).
 fleetinfo_version: "1.0.0"
 
-# Mot de passe de la page /status (valeur réelle chiffrée dans vault.yml)
+# --- Valeurs partagées entre rôles (définies une seule fois) -------------------------------
+# Port HTTP du site : nginx y écoute (rôle webserver) et le contrôle de santé l'interroge
+# (rôle fleetinfo). Doit rester cohérent avec le firewall GCP (Terraform, var.http_port) et
+# les ports publiés par local/docker-compose.yml.
+socle_http_port: 80
+webserver_listen_port: "{{ socle_http_port }}"
+fleetinfo_health_port: "{{ socle_http_port }}"
+
+# Racine de l'application : le rôle fleetinfo y crée releases/ et le lien current, que le
+# rôle webserver sert comme racine du site.
+socle_app_root: /opt/fleetinfo
+fleetinfo_base_dir: "{{ socle_app_root }}"
+webserver_document_root: "{{ socle_app_root }}/current"
+
+# --- Bannière de connexion (rôle common) ---------------------------------------------------
+# Où trouver l'essentiel quand on se connecte en SSH sur un serveur du socle.
+common_motd_extra_lines:
+  - "Application   : Fleet Info (release active : {{ socle_app_root }}/current)"
+  - "Journal       : /var/log/fleetinfo/deploy.log"
+  - "Site nginx    : /etc/nginx/sites-enabled/fleetinfo.conf"
+
+# --- Secrets (valeurs réelles chiffrées dans vault.yml) ------------------------------------
+# Mot de passe du compte autorisé sur la page /status (rôle webserver).
 webserver_status_password: "{{ vault_webserver_status_password }}"

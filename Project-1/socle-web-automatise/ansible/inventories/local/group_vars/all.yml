@@ -1,11 +1,21 @@
 ---
-# Rôle : variables propres à l'environnement LOCAL.
-# Chargé uniquement quand on utilise l'inventaire inventories/local.
+# inventories/local/group_vars/all.yml — variables propres à l'environnement LOCAL.
+# Chargé uniquement avec l'inventaire inventories/local/. Son pendant cloud :
+# inventories/cloud/group_vars/all.yml. C'est dans ces deux fichiers (et dans les inventaires
+# eux-mêmes), et seulement là, que les deux environnements diffèrent.
 
-# Connexion SSH vers les conteneurs
+# --- Connexion SSH vers les conteneurs nœuds ---
+# Utilisateur créé dans l'image des nœuds (local/node/Dockerfile), sudo sans mot de passe.
 ansible_user: ansible
-ansible_ssh_private_key_file: /workspace/local/ssh/fleet_key
+# Clé privée générée par local/scripts/generate-keys.sh, recopiée avec les droits 600
+# par l'entrypoint du controller (local/controller/entrypoint.sh).
+ansible_ssh_private_key_file: /root/.ssh/fleet_key
+# Les nœuds sont reconstruits à volonté (nouvelles clés d'hôte à chaque build de l'image) :
+# vérifier la clé d'hôte n'apporterait aucune sécurité sur ce réseau Docker privé.
 ansible_host_key_checking: false
 
-# Identité de l'environnement, lue par les rôles via leurs defaults
+# --- Identité de l'environnement (affichée par les rôles common et fleetinfo) ---
 socle_env: local
+
+# Pas de zone ni de type de machine en local : fleetinfo_cloud_* gardent leurs valeurs par
+# défaut (chaînes vides) et la page Fleet Info masque proprement la section « Cloud ».

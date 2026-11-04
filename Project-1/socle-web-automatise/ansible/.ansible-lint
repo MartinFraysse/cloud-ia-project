@@ -1,7 +1,10 @@
 ---
-# Rôle : configuration ansible-lint du projet.
-profile: moderate
+# .ansible-lint — configuration d'ansible-lint pour le socle.
+# Lancement (dans le controller, depuis ansible/) : ansible-lint
+# Profil "production" : le plus strict des profils fournis par ansible-lint.
+profile: production
 
 exclude_paths:
   - .ansible/                  # cache où ansible-lint installe lui-même les dépendances de requirements.yml
-  - roles/geerlingguy.nginx/   # rôle public, non maintenu par nous (justifié dans docs/)
+  - collections/               # collections Galaxy installées (code tiers)
+  - roles/geerlingguy.nginx/   # rôle public, non maintenu par nous (justifié dans docs/decisions.md)
