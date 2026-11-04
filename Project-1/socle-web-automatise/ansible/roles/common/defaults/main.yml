@@ -1,25 +1,33 @@
 ---
-# defaults file for roles/common
-common_motd_footer: "Généré par Ansible (rôle common) - ne pas modifier à la main"
 # Rôle common — valeurs par défaut (précédence la PLUS FAIBLE : surchargeables partout).
 # Toutes les variables sont préfixées "common_" pour éviter les collisions entre rôles.
+# Tableau récapitulatif : roles/common/README.md.
 
-# Paquets de base présents sur tout serveur
+# Paquets de base présents sur tout serveur du socle
 common_packages:
   - curl
   - vim
   - ca-certificates
   - tzdata
 
+# Durée (secondes) pendant laquelle le cache apt est considéré comme frais : évite un
+# "apt-get update" à chaque exécution (plus rapide, et sans effet sur l'idempotence).
+common_apt_cache_valid_time: 3600
 
 # Fuseau horaire du serveur (format IANA)
 common_timezone: "Europe/Paris"
 
-# Utilisateur d'exploitation (lecture des journaux, sans sudo : moindre privilège)
+# Utilisateur d'exploitation : lecture des journaux, SANS sudo (moindre privilège)
 common_ops_user: "fleetops"
 common_ops_user_groups:
-  - adm               # lecture de /var/log/* (dont les logs nginx)
+  - adm               # lecture de /var/log/* (journaux nginx et de déploiement)
   - systemd-journal   # lecture de journalctl
 
-# Environnement affiché dans la bannière (variable globale d'inventaire)
+# Environnement affiché dans la bannière (socle_env vient des group_vars d'inventaire)
 common_environment: "{{ socle_env | default('inconnu') }}"
+
+# Lignes libres ajoutées à la bannière (ex. emplacements utiles à l'exploitation)
+common_motd_extra_lines: []
+
+# Dernière ligne de la bannière
+common_motd_footer: "Serveur géré par Ansible : aucune modification manuelle, passer par le dépôt Git."

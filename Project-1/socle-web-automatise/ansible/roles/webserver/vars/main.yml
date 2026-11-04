@@ -1,5 +1,12 @@
 ---
 # Rôle webserver — constantes internes (chemins Debian, non destinés à être surchargés).
+
+# Fichier du site Fleet Info, inclus par le nginx.conf de geerlingguy.nginx (sites-enabled/*)
 webserver_site_path: /etc/nginx/sites-enabled/fleetinfo.conf
+# Comptes autorisés sur /status (format htpasswd)
 webserver_status_htpasswd_path: /etc/nginx/fleetinfo-status.htpasswd
-webserver_nginx_group: www-data   # groupe des workers nginx sous Debian : doit pouvoir lire le htpasswd
+# Groupe des workers nginx sous Debian : il doit pouvoir lire le fichier htpasswd
+webserver_nginx_group: www-data
+# Journaux du site
+webserver_access_log: /var/log/nginx/fleetinfo.access.log
+webserver_error_log: /var/log/nginx/fleetinfo.error.log

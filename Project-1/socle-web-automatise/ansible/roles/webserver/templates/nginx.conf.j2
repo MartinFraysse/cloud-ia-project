@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+# Source : roles/webserver/templates/nginx.conf.j2, enveloppe du template du rôle public
+#          geerlingguy.nginx (roles/geerlingguy.nginx/templates/nginx.conf.j2, inclus tel quel).
+{#
+  Le template du rôle public n'écrit aucun en-tête : cette enveloppe l'ajoute pour que
+  /etc/nginx/nginx.conf soit, comme tous les fichiers générés du socle, identifiable comme
+  géré par Ansible. Le contenu reste à 100 % celui de geerlingguy.nginx (aucune duplication).
+  Chemin d'include relatif au dossier du playbook (ansible/), comme le préconise le rôle public.
+#}
+{% include 'roles/geerlingguy.nginx/templates/nginx.conf.j2' %}

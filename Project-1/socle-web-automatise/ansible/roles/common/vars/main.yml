@@ -1,4 +1,5 @@
 ---
-# vars file for roles/common
 # Rôle common — constantes INTERNES (précédence forte : non destinées à être surchargées).
+
+# Bannière affichée après chaque connexion SSH (pam_motd, Debian)
 common_motd_path: /etc/motd

@@ -1,6 +1,8 @@
 ---
 # Rôle webserver — site nginx de Fleet Info et page /status protégée.
-# nginx lui-même (paquet, nginx.conf, service) est géré par la dépendance geerlingguy.nginx.
+# nginx lui-même (paquet, nginx.conf, service) est installé par la dépendance geerlingguy.nginx
+# (meta/main.yml), exécutée automatiquement AVANT ces tâches.
+# Pas de "become" ici : l'élévation est déclarée par le play (site.yml).
 
 - name: Installer passlib (bibliothèque requise par le module htpasswd)
   ansible.builtin.apt:
@@ -12,10 +14,12 @@
     path: "{{ webserver_status_htpasswd_path }}"
     name: "{{ webserver_status_user }}"
     password: "{{ webserver_status_password }}"
+    crypt_scheme: "{{ webserver_status_crypt_scheme }}"
     owner: root
     group: "{{ webserver_nginx_group }}"
     mode: "0640"          # lisible par nginx (www-data), illisible par les autres comptes
   no_log: true            # le mot de passe n'apparaît jamais dans la sortie d'Ansible
+  # Pas de handler : nginx relit le fichier htpasswd à chaque requête authentifiée.
 
 - name: Déployer la configuration du site Fleet Info
   ansible.builtin.template:
@@ -24,4 +28,12 @@
     owner: root
     group: root
     mode: "0644"
+    # 1er garde-fou, AVANT écriture : le fichier candidat est testé par "nginx -t" dans une
+    # configuration minimale qui l'inclut. Invalide => la tâche échoue et le fichier en place
+    # n'est jamais remplacé (il ne peut donc pas casser un futur redémarrage de nginx).
+    validate: >-
+      sh -c 'conf=$(mktemp) && printf "events {}\nhttp {\n include /etc/nginx/mime.types;\n include %s;\n}\n" > "$conf"
+      && nginx -t -q -c "$conf"; rc=$?; rm -f "$conf"; exit $rc'
+  # 2e garde-fou, chaîne de handlers : validation de la configuration COMPLÈTE (nginx -t)
+  # PUIS rechargement, seulement si le fichier a changé.
   notify: Valider la configuration nginx

@@ -1,23 +1,33 @@
 ---
 # Rôle webserver — métadonnées et dépendances.
-# geerlingguy.nginx installe nginx et gère nginx.conf ; ce rôle gère le site Fleet Info.
+# geerlingguy.nginx (rôle public, version épinglée dans requirements.yml) installe nginx,
+# gère nginx.conf (validé par "nginx -t" avant d'être posé) et le service ; ce rôle-ci gère
+# le site Fleet Info et la page /status. Justification du choix : docs/decisions.md (ADR-04).
 galaxy_info:
   role_name: webserver
+  namespace: novaretail
   author: "Équipe Plateforme NovaRetail"
-  description: "Site nginx de Fleet Info + page /status protégée (enveloppe de geerlingguy.nginx)"
+  description: "Site nginx de Fleet Info + page /status protégée (s'appuie sur geerlingguy.nginx)"
   license: MIT
   min_ansible_version: "2.17"
   platforms:
     - name: Debian
       versions:
         - bookworm
+  galaxy_tags:
+    - web
+    - nginx
 dependencies:
   - role: geerlingguy.nginx
     vars:
       # Supprime le site "default" livré par Debian : il écoute aussi sur 80 en default_server,
-      # ce qui entrerait en conflit avec notre site (nginx -t échouerait : "duplicate default server")
+      # ce qui entrerait en conflit avec notre site (nginx -t : "duplicate default server").
       nginx_remove_default_vhost: true
-      # On n'utilise pas le mécanisme de vhosts du rôle public (ses vhosts ne sont pas validés par nginx -t)
+      # Le mécanisme de vhosts du rôle public n'est pas utilisé : notre site est un template
+      # de CE rôle, avec sa propre chaîne de handlers (validation puis rechargement).
       nginx_vhosts: []
-      # Masque la version de nginx dans les en-têtes HTTP et les pages d'erreur (réduit la surface d'attaque)
+      # Masque la version de nginx dans les en-têtes HTTP et les pages d'erreur.
       nginx_server_tokens: "off"
+      # nginx.conf généré via notre enveloppe, qui ajoute l'en-tête {{ ansible_managed }}
+      # au template du rôle public (inchangé). playbook_dir = dossier ansible/ (site.yml).
+      nginx_conf_template: "{{ playbook_dir }}/roles/webserver/templates/nginx.conf.j2"

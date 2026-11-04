@@ -1,0 +1,40 @@
+---
+# Rôle webserver — spécification des variables d'entrée, validée automatiquement par Ansible
+# avant la première tâche du rôle. Les valeurs "default" documentent defaults/main.yml.
+argument_specs:
+  main:
+    short_description: Site nginx de Fleet Info et page /status protégée
+    description:
+      - Configure le site nginx de Fleet Info (page d'accueil, /health, /status) au-dessus de
+        l'installation fournie par geerlingguy.nginx.
+    author: Équipe Plateforme NovaRetail
+    options:
+      webserver_listen_port:
+        type: int
+        default: 80
+        description: Port d'écoute HTTP du site.
+      webserver_document_root:
+        type: path
+        default: /opt/fleetinfo/current
+        description: Racine servie (lien "current" géré par le rôle fleetinfo).
+      webserver_status_user:
+        type: str
+        default: exploitation
+        description: Compte autorisé sur la page /status.
+      webserver_status_password:
+        type: str
+        required: true
+        no_log: true
+        description:
+          - Mot de passe du compte /status. Secret, sans valeur par défaut ; fourni par
+            Ansible Vault (vault_webserver_status_password).
+      webserver_status_crypt_scheme:
+        type: str
+        default: apr_md5_crypt
+        choices: [apr_md5_crypt, sha256_crypt, sha512_crypt, md5_crypt]
+        description: Algorithme de hachage du fichier htpasswd.
+      webserver_status_allowed_networks:
+        type: list
+        elements: str
+        default: []
+        description: Plages IP autorisées sur /status en plus de l'authentification (vide = toutes).

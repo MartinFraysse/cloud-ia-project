@@ -1,7 +1,9 @@
 ---
-# Rôle common — métadonnées Galaxy et dépendances.
+# Rôle common — métadonnées Galaxy et dépendances (aucune dépendance de rôle).
+# Validation des variables d'entrée : meta/argument_specs.yml.
 galaxy_info:
   role_name: common
+  namespace: novaretail
   author: "Équipe Plateforme NovaRetail"
   description: "Socle de tout serveur : paquets, fuseau horaire, utilisateur d'exploitation, bannière"
   license: MIT
@@ -10,4 +12,7 @@ galaxy_info:
     - name: Debian
       versions:
         - bookworm
+  galaxy_tags:
+    - system
+    - baseline
 dependencies: []

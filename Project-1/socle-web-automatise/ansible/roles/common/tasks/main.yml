@@ -1,15 +1,32 @@
-# Rôle common — socle de tout serveur : paquets, fuseau horaire,
-# utilisateur d'exploitation, bannière de connexion.
-# Pas de become ici : il est posé au niveau du play (site.yml).
 ---
+# Rôle common — socle de tout serveur : paquets de base, fuseau horaire,
+# utilisateur d'exploitation, bannière de connexion.
+# Pas de "become" ici : l'élévation est déclarée par le play (site.yml).
+# Les variables d'entrée sont validées par meta/argument_specs.yml avant la première tâche.
+
+- name: Vérifier que la cible est une Debian 12 gérée par systemd
+  # Échoue tôt et clairement sur une cible non supportée, avant toute modification.
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Debian'
+      - ansible_facts.distribution_major_version == '12'
+      - ansible_facts.service_mgr == 'systemd'
+    fail_msg: >-
+      {{ inventory_hostname }} n'est pas une Debian 12 sous systemd
+      ({{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }},
+      {{ ansible_facts.service_mgr }}) : le socle ne supporte que cette cible.
+    quiet: true
+
 - name: Installer les paquets de base
   ansible.builtin.apt:
     name: "{{ common_packages }}"
     state: present
     update_cache: true
+    cache_valid_time: "{{ common_apt_cache_valid_time }}"
 
 - name: Régler le fuseau horaire
-  # Passe par timedatectl (systemd) : c'est pour ça que les nœuds ont systemd + dbus
+  # Passe par timedatectl (systemd-timedated via D-Bus) : c'est pourquoi l'image des
+  # nœuds locaux embarque systemd et dbus, comme une VM Debian 12 de GCP.
   community.general.timezone:
     name: "{{ common_timezone }}"
 
@@ -22,7 +39,7 @@
     append: true          # AJOUTE ces groupes sans retirer ceux que le compte aurait déjà
     create_home: true
 
-- name: Déployer le message du jour (motd)
+- name: Déployer la bannière de connexion (motd)
   ansible.builtin.template:
     src: motd.j2
     dest: "{{ common_motd_path }}"

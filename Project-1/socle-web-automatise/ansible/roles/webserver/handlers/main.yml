@@ -1,13 +1,20 @@
 ---
-# Rôle webserver — handlers, chaînés par notify (même mécanique que le lab handlers, ex. 4).
-# Chaîne : tâche template -> "Valider la configuration nginx" -> "Recharger nginx".
-# Si nginx -t échoue (code retour != 0), le handler est en échec : la chaîne s'arrête
-# et "Recharger nginx" n'est jamais exécuté. Une config invalide n'est donc jamais chargée.
+# Rôle webserver — handlers, chaînés par notify.
+# Chaîne : tâche template -> « Valider la configuration nginx » -> « Recharger nginx ».
+# Si "nginx -t" échoue (code retour != 0), le premier handler est en échec : la chaîne
+# s'arrête et « Recharger nginx » n'est jamais exécuté. nginx continue de tourner avec sa
+# configuration précédente, chargée en mémoire : une configuration invalide n'est jamais appliquée.
+#
+# Reload plutôt que restart : un reload (SIGHUP) relit la configuration sans couper les
+# connexions en cours ni interrompre le service, et suffit pour tout ce que gère ce rôle
+# (site, port d'écoute, /status). Le seul redémarrage du socle est celui déclenché par
+# geerlingguy.nginx à la première installation (suppression du site "default" de Debian).
 
 - name: Valider la configuration nginx
+  # command est nécessaire : aucun module Ansible ne valide une configuration nginx.
   ansible.builtin.command: nginx -t
   # Volontairement "changed" : c'est ce qui permet de notifier le handler suivant.
-  # Sans risque pour l'idempotence : ce handler ne s'exécute que si la config a déjà changé.
+  # Sans risque pour l'idempotence : ce handler ne s'exécute que si la configuration a changé.
   changed_when: true
   notify: Recharger nginx
 

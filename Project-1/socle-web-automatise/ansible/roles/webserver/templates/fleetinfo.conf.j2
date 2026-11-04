@@ -1,28 +1,44 @@
-# {{ ansible_managed }}  
-# Site Fleet Info : page d'accueil, contrôle de santé /health, statut technique /status.
+# {{ ansible_managed }}
+# Source : roles/webserver/templates/fleetinfo.conf.j2
+# Site Fleet Info : page d'accueil /, contrôle de santé /health, statut technique /status.
 server {
-    # Pas de "listen [::]:..." : les conteneurs du banc n'ont pas d'IPv6, nginx refuserait de démarrer
+    # Pas de "listen [::]:..." : les conteneurs du banc local n'ont pas d'IPv6 et nginx
+    # refuserait de démarrer ; les VM GCP du socle n'en ont pas non plus.
     listen {{ webserver_listen_port }} default_server;
     server_name _;
 
+    # Lien symbolique vers la release active (rôle fleetinfo). nginx le résout à chaque
+    # requête : la bascule d'une release à l'autre est instantanée, sans rechargement.
     root {{ webserver_document_root }};
     index index.html;
 
-    access_log /var/log/nginx/fleetinfo.access.log;
-    error_log  /var/log/nginx/fleetinfo.error.log;
+    access_log {{ webserver_access_log }};
+    error_log  {{ webserver_error_log }};
+
+    # En-têtes de sécurité élémentaires
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
 
     location / {
         try_files $uri $uri/ =404;
     }
 
-    # Contrôle de santé : fichier JSON généré par le rôle fleetinfo dans la release active
+    # Contrôle de santé : fichier JSON généré par le rôle fleetinfo DANS la release active.
+    # Une release incomplète (sans health.json) répond donc 404 : le déploiement échoue.
     location = /health {
+        default_type application/json;
         try_files /health.json =404;
     }
 
-    # Page technique nginx (connexions actives, requêtes traitées), protégée par mot de passe
+    # Page technique nginx (connexions actives, requêtes traitées), protégée par mot de passe.
     location = /status {
         stub_status;
+{% for network in webserver_status_allowed_networks %}
+        allow {{ network }};
+{% endfor %}
+{% if webserver_status_allowed_networks | length > 0 %}
+        deny all;
+{% endif %}
         auth_basic "Fleet Info - statut technique";
         auth_basic_user_file {{ webserver_status_htpasswd_path }};
         access_log off;

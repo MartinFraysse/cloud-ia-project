@@ -1,12 +1,27 @@
 ---
-# Rôle webserver — valeurs par défaut (surchargeables). Préfixe "webserver_".
+# Rôle webserver — valeurs par défaut (précédence la plus faible, surchargeables).
+# Préfixe "webserver_". Tableau récapitulatif : roles/webserver/README.md.
 
-# Port d'écoute HTTP du site (le firewall GCP et le docker-compose publient le 80)
+# Port d'écoute HTTP du site. Le socle le fixe une seule fois via socle_http_port
+# (group_vars/all/vars.yml), partagé avec le contrôle de santé du rôle fleetinfo.
 webserver_listen_port: 80
 
 # Racine servie : le lien symbolique "current" géré par le rôle fleetinfo.
-# nginx résout le lien à CHAQUE requête : basculer "current" ne demande aucun reload.
+# nginx résout ce lien à CHAQUE requête : basculer "current" ne demande aucun rechargement.
 webserver_document_root: /opt/fleetinfo/current
 
-# Compte autorisé sur /status
+# Compte autorisé sur la page /status (authentification HTTP Basic)
 webserver_status_user: "exploitation"
+
+# Mot de passe de ce compte : AUCUNE valeur par défaut, c'est un secret.
+# Le socle le fournit via group_vars/all/vars.yml -> vault_webserver_status_password (Vault).
+# webserver_status_password:
+
+# Algorithme de hachage du fichier htpasswd. apr_md5_crypt est vérifié par nginx lui-même,
+# sans coût CPU notable par requête ; la robustesse repose sur un mot de passe long et
+# aléatoire (24 caractères générés, stocké dans Vault). Alternative : sha512_crypt.
+webserver_status_crypt_scheme: apr_md5_crypt
+
+# Plages IP autorisées sur /status EN PLUS de l'authentification (vide = toutes).
+# Exemple : ["10.10.0.0/24"] pour réserver la page au réseau interne.
+webserver_status_allowed_networks: []

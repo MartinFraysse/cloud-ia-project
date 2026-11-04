@@ -1,7 +1,13 @@
-# {{ ansible_managed }}  
-========================================================
+# {{ ansible_managed }}
+# Source : roles/common/templates/motd.j2
+==========================================================================
+  Socle Web Automatisé - NovaRetail
+  Hôte          : {{ ansible_facts.fqdn | default(inventory_hostname) }}
   Environnement : {{ common_environment }}
-  Hôte          : {{ inventory_hostname }}
-  Rôle appliqué : common
+  Système       : {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }} ({{ ansible_facts.distribution_release }})
+  Compte d'exploitation : {{ common_ops_user }} (lecture des journaux, sans sudo)
+{% for line in common_motd_extra_lines %}
+  {{ line }}
+{% endfor %}
   {{ common_motd_footer }}
-========================================================
+==========================================================================

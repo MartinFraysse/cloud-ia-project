@@ -1,0 +1,48 @@
+---
+# Rôle common — spécification des variables d'entrée.
+# Ansible valide automatiquement ces types AVANT la première tâche du rôle : une valeur
+# invalide (ex. une liste à la place d'une chaîne) arrête le play avec un message explicite.
+# Les valeurs "default" documentent celles de defaults/main.yml (qui reste la référence).
+argument_specs:
+  main:
+    short_description: Socle système de tout serveur du socle web
+    description:
+      - Installe les paquets de base, règle le fuseau horaire, crée l'utilisateur
+        d'exploitation et déploie la bannière de connexion.
+    author: Équipe Plateforme NovaRetail
+    options:
+      common_packages:
+        type: list
+        elements: str
+        default: [curl, vim, ca-certificates, tzdata]
+        description: Paquets de base installés sur tout serveur.
+      common_apt_cache_valid_time:
+        type: int
+        default: 3600
+        description: Durée de validité (s) du cache apt avant un nouvel apt-get update.
+      common_timezone:
+        type: str
+        default: Europe/Paris
+        description: Fuseau horaire IANA du serveur.
+      common_ops_user:
+        type: str
+        default: fleetops
+        description: Compte d'exploitation (sans sudo).
+      common_ops_user_groups:
+        type: list
+        elements: str
+        default: [adm, systemd-journal]
+        description: Groupes secondaires du compte d'exploitation (lecture des journaux).
+      common_environment:
+        type: str
+        default: "{{ socle_env | default('inconnu') }}"
+        description: Environnement affiché dans la bannière (local / cloud).
+      common_motd_extra_lines:
+        type: list
+        elements: str
+        default: []
+        description: Lignes libres ajoutées à la bannière de connexion.
+      common_motd_footer:
+        type: str
+        default: "Serveur géré par Ansible : aucune modification manuelle, passer par le dépôt Git."
+        description: Dernière ligne de la bannière.

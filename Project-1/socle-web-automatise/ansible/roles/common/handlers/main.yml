@@ -1,2 +1,7 @@
 ---
-# handlers file for roles/common
+# Rôle common — handlers.
+# Aucun handler : aucune des tâches du rôle n'exige de redémarrer un service.
+#   - le fuseau horaire est appliqué immédiatement par timedatectl (systemd-timedated) ;
+#   - la bannière /etc/motd est relue par pam_motd à chaque nouvelle connexion SSH.
+# Le fichier est conservé pour respecter l'arborescence standard d'un rôle.
+[]
