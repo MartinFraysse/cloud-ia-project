@@ -257,10 +257,10 @@ helm lint helm/guestbook
 - [x] `storageClassName` écrit seulement si une classe est fournie.
 - [x] `values.yaml` entièrement commenté.
 - [x] `helm lint`, `helm template`, `helm package` et contrôles `grep` réussis.
-- [ ] Fichiers `values-<ENV>.yaml` et installation des trois releases → partie 6.
+- [x] Fichiers `values-<ENV>.yaml` et installation des trois releases → partie 6.
 
-➡️ **Suite :** Partie 6 — Les environnements dev / staging / prod *(à venir)*.
+➡️ **Suite :** [Partie 6 — Les environnements dev / staging / prod](06-environnements-dev-staging-prod.md).
 
 ---
 
-[⬅️ Partie 4 — La persistance des données](04-persistance-des-donnees.md) · [🏠 Sommaire](README.md)
+[⬅️ Partie 4 — La persistance des données](04-persistance-des-donnees.md) · [🏠 Sommaire](README.md) · [Partie 6 — Les environnements ➡️](06-environnements-dev-staging-prod.md)
