@@ -1,0 +1,67 @@
+# =============================================================================
+# inventories/cloud/fleet.gcp.yml.example — MODÈLE de l'inventaire dynamique GCP.
+#
+# Le plugin google.cloud.gcp_compute n'accepte le project_id QUE dans ce fichier (aucune
+# variable d'environnement n'existe pour l'option "projects"). Pour ne jamais versionner
+# l'identifiant d'une session de lab, le vrai fichier fleet.gcp.yml (ignoré par Git) est
+# GÉNÉRÉ depuis ce modèle et les outputs Terraform, sur le poste, après "terraform apply" :
+#
+#   ./scripts/prepare-cloud-inventory.sh
+#
+# Puis, dans le controller (dossier ansible/) :
+#   ansible-inventory -i inventories/cloud/fleet.gcp.yml --graph
+#
+# Le suffixe ".gcp.yml" est OBLIGATOIRE : c'est lui qui fait choisir le plugin
+# google.cloud.gcp_compute par le mécanisme "auto" (cf. [inventory] dans ansible.cfg).
+# =============================================================================
+plugin: google.cloud.gcp_compute
+
+# Remplacé par scripts/prepare-cloud-inventory.sh (terraform output -raw project_id).
+projects:
+  - __GCP_PROJECT_ID__
+
+# Application Default Credentials ("gcloud auth application-default login" sur le poste),
+# copiées dans .secrets/ pour le controller par le script ci-dessus et désignées par la
+# variable GOOGLE_APPLICATION_CREDENTIALS (local/docker-compose.yml). Aucune clé de compte
+# de service à créer ni à distribuer.
+auth_kind: application
+
+# Sélection des VM côté API Compute Engine (syntaxe de filtre GCP, pas du Jinja2) : seules
+# les VM étiquetées app=fleetinfo par Terraform ET démarrées sont retenues. Aucune IP ici.
+filters:
+  - labels.app = fleetinfo
+  - status = RUNNING
+
+# Nom d'hôte Ansible = nom de la VM (fleetinfo-web-1, ...) : lisible dans --graph et les logs.
+hostnames:
+  - name
+
+# Toutes les données brutes de l'API (zone, machineType, labels, ...) deviennent des
+# variables d'hôte préfixées "gce_" (gce_zone, gce_machineType, gce_labels...) : aucune
+# collision possible avec les variables du projet.
+vars_prefix: gce_
+
+# compose : variables de connexion calculées à partir des attributs bruts de l'API
+# (mêmes noms de champs, en camelCase, que "gcloud compute instances describe").
+compose:
+  # IP publique éphémère de la VM (le nom d'hôte, lui, n'est pas résolvable depuis le poste).
+  ansible_host: networkInterfaces[0].accessConfigs[0].natIP
+  # Utilisateur SSH déduit de la métadonnée "ssh-keys" posée par Terraform ("<user>:<clé>") :
+  # il reste aligné sur var.ssh_user sans être recopié ici. Repli si la métadonnée manque :
+  # ansible_user de inventories/cloud/group_vars/all.yml, qui porte aussi la clé privée et les
+  # options SSH (communes à toutes les VM).
+  ansible_user: metadata['ssh-keys'].split(':')[0]
+
+# keyed_groups : groupes construits à partir des labels posés par Terraform.
+keyed_groups:
+  # Label role=web -> groupe "web", EXACTEMENT le nom du groupe de l'inventaire local :
+  # site.yml (hosts: web) fonctionne sans modification. Sans préfixe ni séparateur.
+  - key: labels.role
+    prefix: ""
+    separator: ""
+  # Label env=cloud -> groupe "env_cloud" (ciblage ponctuel : --limit env_cloud).
+  - key: labels.env
+    prefix: env
+  # Zone -> groupe "zone_us_central1_f" (utile dès qu'on répartit les VM sur plusieurs zones).
+  - key: zone
+    prefix: zone

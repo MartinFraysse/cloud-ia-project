@@ -1,0 +1,27 @@
+---
+# inventories/cloud/group_vars/all.yml — variables propres à l'environnement CLOUD (GCP).
+# Chargé uniquement avec l'inventaire inventories/cloud/fleet.gcp.yml. Son pendant local :
+# inventories/local/group_vars/all.yml. C'est dans ces deux fichiers (et dans les inventaires
+# eux-mêmes), et seulement là, que les deux environnements diffèrent.
+# Les variables gce_* sont fournies par le plugin google.cloud.gcp_compute (vars_prefix: gce_).
+
+# --- Connexion SSH vers les VM ---
+# Utilisateur créé par l'agent invité GCE à partir de la métadonnée "ssh-keys" posée par
+# Terraform (var.ssh_user) ; il est automatiquement sudoer sans mot de passe. L'inventaire
+# dynamique le déduit de cette métadonnée (compose) ; cette valeur ne sert que de repli.
+ansible_user: ansible
+# Même clé de déploiement qu'en local (local/scripts/generate-keys.sh), dont la partie
+# publique est injectée par Terraform (var.ssh_public_key_path).
+ansible_ssh_private_key_file: /root/.ssh/fleet_key
+# Première connexion à une VM tout juste créée : la clé d'hôte inconnue est acceptée et
+# mémorisée (TOFU), mais une clé qui CHANGE ensuite pour la même IP est refusée.
+ansible_ssh_common_args: "-o StrictHostKeyChecking=accept-new"
+
+# --- Identité de l'environnement (affichée par les rôles common et fleetinfo) ---
+socle_env: cloud
+
+# --- Informations propres au cloud, affichées sur la page Fleet Info ---
+# Lues dans l'API Compute Engine par l'inventaire dynamique : rien n'est écrit à la main.
+fleetinfo_cloud_zone: "{{ gce_zone }}"
+fleetinfo_cloud_machine_type: "{{ gce_machineType }}"
+fleetinfo_cloud_public_ip: "{{ ansible_host }}"
