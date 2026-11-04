@@ -2,30 +2,24 @@
 
 ## Objectif
 
-Transformer les manifestes de `k8s/` (parties 3 et 4) en **un seul chart Helm**, utilisable pour
-les trois environnements.
+Transformer les manifestes de `k8s/` (parties 3 et 4) en **un seul chart Helm** pour les trois
+environnements.
 
-| Sans Helm | Avec Helm |
-|---|---|
-| Copier et modifier les fichiers pour chaque environnement | **1 chart** + **1 fichier de valeurs** par environnement |
-| `kubectl apply` fichier par fichier | `helm install / upgrade / rollback` d'un bloc |
-
-> Cette partie construit et vérifie le chart. L'installation de `stack-dev`, `stack-staging` et
-> `stack-prod` est l'objet de la partie 6.
+Cette partie construit et vérifie le chart. L'installation de `stack-dev`, `stack-staging` et
+`stack-prod` est en partie 6.
 
 ---
 
 ## Étape 5.1 — Le principe
 
-| Mot | Définition | Dans le projet |
-|---|---|---|
-| **Chart** | Le paquet Helm : des modèles de manifestes | `helm/guestbook/` |
-| **Template** | Un manifeste contenant des expressions `{{ … }}` | `templates/frontend-service.yaml` |
-| **Values** | Les valeurs utilisées par les templates | `values.yaml`, puis `values-<ENV>.yaml` |
-| **Release** | Une installation du chart, avec un nom | `stack-dev` |
+| Notion | Dans le projet |
+|---|---|
+| **Chart** | `helm/guestbook/` |
+| **Template** | `templates/frontend-service.yaml` |
+| **Values** | `values.yaml`, puis `values-<ENV>.yaml` |
+| **Release** | `stack-dev` |
 
-Helm remplace chaque expression `{{ … }}` par une information venant de **trois sources**, puis
-génère les manifestes finaux :
+Les expressions `{{ … }}` sont remplies à partir de trois sources :
 
 ```mermaid
 flowchart LR
@@ -59,7 +53,7 @@ flowchart LR
 | `.Release.Name`, `.Release.Namespace` | **La commande** (pas un fichier) | `stack-dev`, `dev` |
 | `.Chart.Name`, `.Chart.Version`, `.Chart.AppVersion` | **`Chart.yaml`** | `guestbook`, `0.1.0`, `v5` |
 | `.Values.<clé>` | **`values.yaml`** / `values-<ENV>.yaml` | `.Values.frontend.service.port` = `80` |
-| `include "guestbook.<nom>"` | Une **fonction de `_helpers.tpl`** qui combine les sources ci-dessus | `stack-dev-guestbook-frontend` |
+| `include "guestbook.<nom>"` | Une **fonction de `_helpers.tpl`** | `stack-dev-guestbook-frontend` |
 | Texte sans `{{ }}` | Écrit tel quel | `targetPort: http` |
 
 ```bash
@@ -67,13 +61,10 @@ helm install   stack-dev    helm/guestbook   -n dev
 #        .Release.Name = stack-dev    .Release.Namespace = dev
 ```
 
-Le nom de la release n'est écrit dans aucun fichier : le **même** chart donne
-`stack-dev-guestbook-frontend` avec `helm install stack-dev …` et `stack-prod-guestbook-frontend`
-avec `helm install stack-prod …`.
+Le nom de la release n'est dans aucun fichier. Le même chart donne `stack-dev-guestbook-frontend`
+avec `helm install stack-dev …` et `stack-prod-guestbook-frontend` avec `helm install stack-prod …`.
 
-> `helm template` prend les mêmes arguments que `helm install` mais **affiche** les manifestes au
-> lieu de les installer. Les exemples de cette page ont été obtenus ainsi :
-> `helm template stack-dev helm/guestbook -n dev`.
+Les exemples de cette page sont générés avec `helm template stack-dev helm/guestbook -n dev`.
 
 ---
 
@@ -91,7 +82,7 @@ helm/guestbook/
     └── 10 templates  → un par objet de k8s/, mêmes noms de fichiers
 ```
 
-- Créé avec `helm create`, puis nettoyé des exemples inutiles (HTTPRoute, Ingress, ServiceAccount…).
+- Créé avec `helm create`, puis nettoyé (HTTPRoute, Ingress, ServiceAccount…).
 - `namespaces.yaml` n'a **pas** de template : le namespace est donné à l'installation
   (`-n <ENV> --create-namespace`).
 - `NOTES.txt` affiche la commande d'accès selon le type du Service frontend : `minikube tunnel`
@@ -111,8 +102,8 @@ appVersion: "v5"    # version de l'APPLICATION déployée (tag de l'image fronte
 
 ## Étape 5.3 — `_helpers.tpl` : les noms et les labels
 
-`_helpers.tpl` contient des **fonctions** définies une seule fois (`define`) et appelées par
-tous les templates (`include`). Le `_` indique à Helm de ne pas en faire un objet Kubernetes.
+Les noms et labels sont définis une seule fois (`define`) et appelés par tous les templates
+(`include`).
 
 | Fonction | Résultat (release `stack-dev`) | Utilisée pour |
 |---|---|---|
@@ -140,15 +131,15 @@ selector:                                      # dans les sélecteurs : labels s
   app.kubernetes.io/component: frontend
 ```
 
-Le sélecteur d'un Deployment ne peut plus être modifié après sa création. Il ne contient donc ni
-`version` ni `helm.sh/chart` : sinon, le `helm upgrade` d'une nouvelle version échouerait.
+Le sélecteur d'un Deployment est immuable. Il ne contient donc ni `version` ni `helm.sh/chart`.
+Sinon, le `helm upgrade` d'une nouvelle version échouerait.
 
 ---
 
 ## Étape 5.4 — Les templates
 
-Chaque template reprend son manifeste `k8s/`. Ce qui peut changer selon l'environnement vient des
-valeurs ; le reste est écrit en dur.
+Chaque template reprend son manifeste `k8s/`. Ce qui varie selon l'environnement vient des
+valeurs.
 
 | Vient des valeurs | Reste écrit en dur |
 |---|---|
@@ -159,8 +150,7 @@ valeurs ; le reste est écrit en dur.
 
 ### Les adresses Redis sont calculées
 
-Le nom du Service leader est produit par **une seule fonction**, utilisée par le Service **et**
-par les ConfigMaps qui donnent son adresse :
+Une seule fonction produit le nom du Service leader. Le Service et les ConfigMaps l'utilisent :
 
 ```yaml
 # ConfigMap frontend générée pour stack-dev
@@ -170,15 +160,14 @@ data:
   REDIS_FOLLOWER_SERVICE_HOST: "stack-dev-guestbook-redis-follower"   # = nom du Service followers
 ```
 
-Le nom et l'adresse ne peuvent pas être différents, et chaque release contacte ses propres
-Services Redis.
+Le nom et l'adresse restent identiques. Chaque release contacte ses propres Services Redis.
 
 ### L'annotation `checksum/config`
 
-Kubernetes ne redémarre pas un pod quand sa ConfigMap change. Chaque Deployment porte donc
-l'empreinte (`sha256sum`) de sa ConfigMap :
+Un pod ne redémarre pas quand sa ConfigMap change. Chaque Deployment porte donc l'empreinte
+(`sha256sum`) de sa ConfigMap :
 
-- la ConfigMap change → l'empreinte change → les pods sont recréés avec la nouvelle configuration ;
+- ConfigMap modifiée → empreinte modifiée → pods recréés ;
 - rien ne change → aucun pod recréé (`helm upgrade` reste idempotent).
 
 ---
@@ -194,8 +183,8 @@ minikube, `standard-rwo` sur GKE).
 | `storageClassName: ""` | **Aucune** StorageClass | ❌ PVC `Pending` |
 | `storageClassName: standard` | Exactement cette classe | Seulement si elle existe (pas sur GKE) |
 
-Une valeur vide n'est donc **pas** équivalente à une ligne absente. Le template n'écrit le champ
-que si une classe est fournie :
+Une valeur vide n'équivaut pas à une ligne absente. Le template n'écrit le champ que si une classe
+est fournie :
 
 ```yaml
   {{- if .Values.redisLeader.persistence.storageClass }}
@@ -209,8 +198,8 @@ Avec la valeur par défaut `storageClass: ""`, le PVC généré ne contient pas 
 
 ## Étape 5.6 — `values.yaml`
 
-`values.yaml` contient les **valeurs par défaut**. Chaque clé y est commentée (rôle, unité,
-valeurs possibles) : c'est le fichier de référence pour modifier un réglage.
+`values.yaml` contient les valeurs par défaut. Chaque clé est commentée (rôle, unité, valeurs
+possibles).
 
 | Bloc | Clés principales |
 |---|---|
@@ -219,7 +208,7 @@ valeurs possibles) : c'est le fichier de référence pour modifier un réglage.
 | `redisLeader` | `replicaCount` (doit rester 1), `image`, `service`, probes, `resources`, `persistence` (taille, accessMode, storageClass) |
 | `redisFollower` | `replicaCount`, `image`, `service`, probes, `resources` |
 
-Les fichiers `values-<ENV>.yaml` (partie 6) ne contiendront que les différences : port, nombre de
+Les fichiers `values-<ENV>.yaml` (partie 6) ne contiennent que les différences : port, nombre de
 pods, ressources, taille du disque, label `environment`.
 
 ---
@@ -234,7 +223,7 @@ helm lint helm/guestbook
 
 ![helm lint du chart](screenshots/27-helm-lint-chart.png)
 
-`0 chart(s) failed` : le chart est valide (`icon is recommended` n'est qu'une suggestion).
+`0 chart(s) failed` : le chart est valide. `icon is recommended` est une simple suggestion.
 
 | Vérification | Commande | Attendu |
 |---|---|---|
@@ -244,7 +233,7 @@ helm lint helm/guestbook
 | Aucun label écrit à la main | `grep -rn "app.kubernetes.io" helm/guestbook/templates/*.yaml` | Aucune ligne |
 | Paquet | `helm package helm/guestbook` | `guestbook-0.1.0.tgz` |
 
-> ⚠️ Même les commentaires des templates ne doivent pas contenir « dev », « staging » ou
+> ⚠️ Les commentaires des templates ne doivent pas non plus contenir « dev », « staging » ou
 > « prod » : le `grep` les détecterait.
 
 ---

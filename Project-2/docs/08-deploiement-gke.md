@@ -2,10 +2,10 @@
 
 ## Objectif
 
-Installer l'application sur le cluster GKE créé en partie 7, avec **le même chart Helm et les
-mêmes fichiers de valeurs** qu'en local, en suivant la séquence imposée :
+Installer l'application sur le cluster GKE de la partie 7. Le chart Helm et les fichiers de
+valeurs sont **les mêmes** qu'en local. La séquence est imposée :
 
-1. **Test** : Service `ClusterIP` + `kubectl port-forward` (rien n'est exposé sur Internet) ;
+1. **Test** : Service `ClusterIP` + `kubectl port-forward`. Rien n'est exposé sur Internet.
 2. **Ouverture** : `helm upgrade` → Service `LoadBalancer` → IP publique.
 
 > Prérequis : cluster créé (partie 7). Les commandes Helm se lancent **depuis `Project-2/`**.
@@ -45,9 +45,9 @@ kubectl get namespaces
 ![cluster-info, StorageClass, namespaces](screenshots/61-kubectl-cluster-info-storageclass-namespaces.png)
 
 - Le cluster répond.
-- `standard-rwo (default)` : le PVC du chart, qui n'écrit pas de `storageClassName`, recevra
-  cette classe automatiquement.
-- Seuls les namespaces du système existent : le cluster est vide.
+- `standard-rwo (default)` : le PVC du chart n'indique pas de `storageClassName`. Il reçoit
+  donc cette classe.
+- Seuls les namespaces système existent : le cluster est vide.
 
 ### Passer du local au cloud
 
@@ -74,8 +74,8 @@ kubectl get pods -n dev -w
 ![helm install stack-dev en ClusterIP](screenshots/62-gke-helm-install-dev-clusterip.png)
 
 - Les NOTES proposent la commande `kubectl port-forward`.
-- Première installation plus lente (≈ 2 min 30) : Autopilot crée les nœuds à la demande
-  (`Pending`), puis le disque du leader une fois le pod placé.
+- La première installation prend ≈ 2 min 30. Autopilot crée les nœuds à la demande
+  (`Pending`). Il crée ensuite le disque du leader.
 
 Dans un second terminal, laissé ouvert :
 
@@ -87,7 +87,7 @@ kubectl port-forward svc/stack-dev-guestbook-frontend 8080:8080 -n dev
 |---|---|
 | ![port-forward](screenshots/63-gke-port-forward-dev.png) | ![site de dev](screenshots/64-gke-site-dev-port-forward.png) |
 
-Le site répond sur `http://127.0.0.1:8080`, uniquement depuis ce poste. Un message est saisi.
+Le site répond sur `http://127.0.0.1:8080`, depuis ce poste seulement. On y saisit un message.
 
 ---
 
@@ -105,7 +105,7 @@ kubectl get svc stack-dev-guestbook-frontend -n dev -w   # attendre l'EXTERNAL-I
 | ![upgrade en LoadBalancer](screenshots/65-gke-helm-upgrade-dev-loadbalancer.png) | ![EXTERNAL-IP](screenshots/66-gke-svc-dev-ip-publique.png) |
 
 - Sans `--set`, la valeur de `values.yaml` s'applique : `LoadBalancer`.
-- Google crée un équilibreur de charge et donne une **IP publique** (colonne `EXTERNAL-IP`).
+- Google crée un équilibreur de charge avec une **IP publique** (colonne `EXTERNAL-IP`).
 - Site : `http://<EXTERNAL-IP>:8080`.
 
 ---
@@ -122,7 +122,7 @@ helm list -A
 
 ![staging, prod et helm list](screenshots/67-gke-helm-install-staging-prod-list.png)
 
-3 releases `deployed`, chacune dans son namespace, avec le chart `guestbook-0.3.0`.
+3 releases `deployed`, une par namespace, chart `guestbook-0.3.0`.
 
 ```bash
 kubectl get svc -A | grep LoadBalancer
@@ -138,8 +138,8 @@ kubectl get svc -A | grep LoadBalancer
 
 Sur GKE, chaque Service `LoadBalancer` a sa propre IP publique.
 
-> Choix : staging et prod sont installés directement en `LoadBalancer` ; la séquence de test
-> ClusterIP → port-forward est faite sur dev.
+> Choix : staging et prod sont installés directement en `LoadBalancer`. Le test
+> ClusterIP → port-forward est fait sur dev.
 
 ---
 
@@ -158,10 +158,9 @@ gcloud compute disks list
 - Le pod leader est recréé en ≈ 12 s.
 - PVC `Bound`, 5Gi, `standard-rwo`.
 - **Où sont les données :** pod → PVC → PV → **disque persistant Google** (`pd-balanced`,
-  zonal), visible avec `gcloud compute disks list` sous le même nom que le PV.
+  zonal). `gcloud compute disks list` le montre sous le nom du PV.
 
-Vérification : recharger le site de prod → les messages saisis avant la suppression sont toujours
-là.
+Vérification : recharger le site de prod. Les messages saisis avant la suppression sont là.
 
 ---
 
@@ -191,11 +190,11 @@ kubectl delete pvc --all -n prod                 # PVC de prod conservé par l'a
 cd terraform && terraform destroy
 ```
 
-Les LoadBalancer et les disques des PVC sont des ressources Google créées par Kubernetes, que
-Terraform ne connaît pas : les supprimer **avant** `terraform destroy`.
+Les LoadBalancer et les disques des PVC sont créés par Kubernetes. Terraform ne les connaît
+pas. Il faut les supprimer **avant** `terraform destroy`.
 
-Pour une nouvelle session de lab : supprimer `terraform.tfstate` et `terraform.tfvars` de la
-session précédente (le projet n'existe plus), puis reprendre la partie 7 à l'étape 7.4.
+Nouvelle session de lab : le projet précédent n'existe plus. Supprimer `terraform.tfstate` et
+`terraform.tfvars`, puis reprendre la partie 7 à l'étape 7.4.
 
 ---
 
@@ -220,8 +219,8 @@ session précédente (le projet n'existe plus), puis reprendre la partie 7 à l'
 - [x] PVC provisionnés par `standard-rwo` ; pod leader de prod recréé, disque Google conservé.
 - [x] Même chart et mêmes fichiers de valeurs qu'en local.
 
-➡️ **Suite :** Partie 9 — Exploitation *(à venir)*.
+➡️ **Suite :** [Partie 9 — Exploitation](09-exploitation.md).
 
 ---
 
-[⬅️ Partie 7 — Le cluster GKE avec Terraform](07-cluster-gke-terraform.md) · [🏠 Sommaire](README.md)
+[⬅️ Partie 7 — Le cluster GKE avec Terraform](07-cluster-gke-terraform.md) · [🏠 Sommaire](README.md) · [Partie 9 — Exploitation ➡️](09-exploitation.md)

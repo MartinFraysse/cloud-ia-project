@@ -43,9 +43,7 @@ flowchart LR
 ```
 
 **Priorité : `--set` > `-f values-<ENV>.yaml` > `values.yaml`.** Une clé absente du fichier
-de l'environnement garde sa valeur par défaut.
-
-Helm ne devine pas le fichier à partir du nom : c'est l'option **`-f`** qui le désigne.
+de l'environnement garde sa valeur par défaut. Le fichier est désigné par l'option **`-f`**.
 
 ---
 
@@ -66,9 +64,9 @@ Helm ne devine pas le fichier à partir du nom : c'est l'option **`-f`** qui le 
 
 « — » = pas de ligne dans le fichier : la valeur par défaut s'applique.
 
-> **Pourquoi un port différent ?** Sous macOS / Windows, `minikube tunnel` publie tous les
-> Services sur `127.0.0.1` : deux sites sur le port 80 seraient en conflit. Sous Linux, chaque
-> Service a sa propre IP, mais on garde la même règle partout.
+**Pourquoi un port différent ?** Sous macOS / Windows, `minikube tunnel` publie tous les
+Services sur `127.0.0.1` : deux sites sur le port 80 seraient en conflit. La règle s'applique
+aussi sous Linux.
 
 ### Exemple : `values-staging.yaml`
 
@@ -90,8 +88,7 @@ for env in dev staging prod; do
 done
 ```
 
-`helm lint` vérifie le chart **avec les valeurs** de l'environnement, sans rien installer :
-`1 chart(s) linted, 0 chart(s) failed` pour chacun (capture de l'étape 6.3).
+Résultat attendu pour chacun : `1 chart(s) linted, 0 chart(s) failed` (capture de l'étape 6.3).
 
 ---
 
@@ -104,20 +101,19 @@ kubectl config current-context     # doit afficher "minikube"
 minikube status                    # host / kubelet / apiserver : Running
 ```
 
-`current-context` dit **quel** cluster est visé, pas s'il est allumé. Si minikube est arrêté,
-`helm install` échoue avec `cluster unreachable … no route to host` : lancer `minikube start`.
+Si minikube est arrêté, `helm install` échoue avec `cluster unreachable … no route to host` :
+lancer `minikube start`.
 
 ### Les namespaces
 
-Les namespaces `dev`, `staging` et `prod` existent déjà : ils ont été créés en partie 3 par
-`k8s/namespaces.yaml`, avec le label `environment`. On garde quand même `--create-namespace`
-dans la commande : elle fonctionne aussi sur un cluster neuf (GKE). Helm ne pose pas de label
-sur un namespace qu'il crée.
+Les namespaces `dev`, `staging` et `prod` existent déjà (partie 3, `k8s/namespaces.yaml`, avec
+le label `environment`). `--create-namespace` est gardé pour un cluster neuf (GKE). Helm ne pose
+pas de label sur un namespace qu'il crée.
 
 ### Retirer l'ancienne application de `dev`
 
-L'application installée « à la main » en parties 3 et 4 (`kubectl apply -f k8s/`) tournait encore
-dans `dev`. Pour ne garder que la version Helm :
+L'application des parties 3 et 4 (`kubectl apply -f k8s/`) tournait encore dans `dev`. On la
+supprime :
 
 ```bash
 for f in k8s/*.yaml; do
@@ -171,8 +167,7 @@ kubectl get all,cm,pvc -n <ENV>
 | Port du site | 8080 | 8081 | 80 |
 | Disque (PVC) | 1Gi | 1Gi | 5Gi |
 
-Tous les noms commencent par `stack-<ENV>-guestbook-` : les objets des trois releases ne peuvent
-pas entrer en conflit.
+Tous les noms commencent par `stack-<ENV>-guestbook-` : pas de conflit entre releases.
 
 ---
 
@@ -203,9 +198,8 @@ Adresse du site = **`EXTERNAL-IP`** + **premier** port de `PORT(S)` :
 > Les adresses changent à chaque création du Service : toujours relire la colonne `EXTERNAL-IP`.
 > `<pending>` = le tunnel ne tourne pas.
 
-**Isolation :** un message écrit en dev n'apparaît ni en staging ni en prod. Chaque release a
-ses propres Services Redis : la ConfigMap du frontend de dev pointe vers
-`stack-dev-guestbook-redis-leader`, et non vers celui de prod.
+**Isolation :** un message écrit en dev n'apparaît ni en staging ni en prod. La ConfigMap du
+frontend de dev pointe vers `stack-dev-guestbook-redis-leader`.
 
 ---
 
@@ -216,8 +210,7 @@ kubectl delete pod -n prod -l app.kubernetes.io/component=redis-leader
 kubectl get pods -n prod -w        # le nouveau leader passe 0/1 → 1/1 en ~12 s
 ```
 
-Après rechargement de la page de prod, le message est **toujours là** : le nouveau pod remonte le
-même PVC et Redis relit son journal (partie 4).
+Le message de prod est **toujours là** : le nouveau pod remonte le même PVC (partie 4).
 
 ---
 
@@ -239,7 +232,7 @@ Exemple : passer staging à 3 frontends, **sans toucher aux templates**.
    ![helm upgrade de staging](screenshots/35-helm-upgrade-staging-replicas.png)
 
 `REVISION: 3`, puis le frontend passe de `2/3` à `3/3` : un pod **ajouté**, les autres ne sont pas
-recréés. Helm n'applique que la différence.
+recréés.
 
 > ⚠️ Toujours repasser `-f values-<ENV>.yaml` dans un `upgrade`. Sans lui, la release repart des
 > valeurs par défaut (port 80, 1 pod…).
@@ -249,8 +242,6 @@ Le fichier a ensuite été remis à `replicaCount: 2`.
 ---
 
 ## Étape 6.7 — Idempotence : relancer sans rien changer
-
-Relancer `helm upgrade` avec **exactement** les mêmes valeurs ne doit rien casser ni recréer.
 
 ```bash
 kubectl get pods -n prod           # noter les noms et les âges
@@ -267,8 +258,8 @@ helm history stack-prod -n prod
 
 ![helm history](screenshots/39-idempotence-prod-helm-history.png)
 
-- Helm enregistre une **révision 2** : il garde la trace de chaque commande.
-- Kubernetes ne voit **aucune différence** : aucun pod recréé, aucun redémarrage.
+- Helm enregistre une **révision 2**.
+- Aucun pod recréé, aucun redémarrage.
 
 ---
 
@@ -284,8 +275,8 @@ helm history stack-prod -n prod
 
    ![remplacement des pods](screenshots/40-upgrade-version-prod-rolling-update.png)
 
-**Tous les pods sont remplacés** : le label `helm.sh/chart: guestbook-0.2.0` est dans le modèle
-des pods, il a changé. Chaque composant est remplacé selon sa stratégie :
+**Tous les pods sont remplacés** : le label `helm.sh/chart: guestbook-0.2.0` du modèle des pods a
+changé. Chaque composant suit sa stratégie :
 
 ```mermaid
 flowchart LR
@@ -306,27 +297,26 @@ flowchart LR
 
 | Stratégie | Composants | Fonctionnement | Coupure |
 |---|---|---|---|
-| **RollingUpdate** (défaut) | frontend, followers | Un nouveau pod est créé ; quand il est **prêt** (readiness probe), un ancien est arrêté ; on recommence | Non |
-| **Recreate** | Redis leader | L'ancien est arrêté, **puis** le nouveau démarre | Quelques secondes |
+| **RollingUpdate** (défaut) | frontend, followers | Nouveau pod **prêt**, puis arrêt d'un ancien | Non |
+| **Recreate** | Redis leader | Arrêt de l'ancien, **puis** démarrage du nouveau | Quelques secondes |
 
-Le leader est en `Recreate` car son disque est `ReadWriteOnce` : un seul pod peut s'y brancher.
+Le leader est en `Recreate` car son disque est `ReadWriteOnce`.
 
 **États des anciens pods :**
 
 | État | Pods | Explication |
 |---|---|---|
-| `Completed` | anciens frontends | Apache est le processus principal : il reçoit l'ordre d'arrêt (SIGTERM) et s'arrête proprement (code 0) |
-| `Error` | anciens followers | Dans l'image Google, le processus principal est `/bin/sh -c /run.sh`, qui ignore SIGTERM et ne le transmet pas à Redis. Kubernetes force l'arrêt au bout de 30 s (code 137) |
+| `Completed` | anciens frontends | Apache reçoit SIGTERM et s'arrête proprement (code 0) |
+| `Error` | anciens followers | `/bin/sh -c /run.sh` (image Google) ne transmet pas SIGTERM à Redis : arrêt forcé après 30 s (code 137) |
 
-Le `Error` des followers est **sans conséquence** : ils n'ont pas de données propres et leur
-remplaçant était déjà prêt.
+Le `Error` des followers est **sans conséquence** : leur remplaçant était déjà prêt.
 
 ![helm history : révision 0.2.0](screenshots/41-upgrade-version-prod-helm-history.png)
 
 ![message conservé](screenshots/42-upgrade-version-prod-message-conserve.png)
 
-Nouvelle révision en `guestbook-0.2.0`, et le message de prod est **toujours là** : le PVC n'a
-pas été recréé.
+Nouvelle révision en `guestbook-0.2.0`. Le message de prod est **toujours là** : le PVC n'a pas
+été recréé.
 
 ---
 
@@ -346,14 +336,13 @@ helm history stack-prod -n prod
 | 2 | 0.3.0 | Upgrade complete (montée de version) |
 | 3 | **0.2.0** | **Rollback to 1** |
 
-Un rollback **ne supprime aucune révision** : il en ajoute une, copie de la révision visée.
+Un rollback **ajoute** une révision, copie de la révision visée. Il n'en supprime aucune.
 
 ![message conservé après rollback](screenshots/48-helm-rollback-prod-message-conserve.png)
 
 Le message est **toujours là** : le rollback remplace les pods, pas le disque.
 
-> L'historique Helm est un **journal** : aucune commande ne permet d'en retirer une ligne. Un
-> rollback lancé deux fois crée deux révisions identiques, sans effet sur le cluster
+> Un rollback lancé deux fois crée deux révisions identiques, sans effet sur le cluster
 > ([capture 43](screenshots/43-helm-rollback-prod-history.png)). Ne jamais supprimer à la main
 > les Secrets `sh.helm.release.v1.<release>.v<N>` qui stockent les révisions.
 
@@ -361,8 +350,8 @@ Le message est **toujours là** : le rollback remplace les pods, pas le disque.
 
 ## Étape 6.10 — Local / cloud : passer le site en ClusterIP
 
-Sur GKE, la première mise en ligne se fait **sans exposer le site** (partie 8). Le type du Service
-frontend est une valeur ; on la change **ponctuellement** avec `--set`, sans fichier de plus :
+Sur GKE, la première mise en ligne se fait **sans exposer le site** (partie 8). On change le type
+du Service frontend **ponctuellement** avec `--set` :
 
 ```bash
 helm upgrade stack-dev helm/guestbook -n dev -f helm/guestbook/values-dev.yaml \
@@ -372,9 +361,8 @@ kubectl port-forward svc/stack-dev-guestbook-frontend 9090:8080 -n dev
 
 ![upgrade ClusterIP et port-forward](screenshots/44-helm-upgrade-dev-clusterip-port-forward.png)
 
-- Les NOTES s'adaptent seules : elles proposent `kubectl port-forward` au lieu de
-  `minikube tunnel`.
-- `9090:8080` = port **local** 9090 → port **du Service** 8080. Le port local est libre.
+- Les NOTES proposent alors `kubectl port-forward` au lieu de `minikube tunnel`.
+- `9090:8080` = port **local** 9090 → port **du Service** 8080.
 
 ![site de dev par le tunnel](screenshots/45-site-dev-via-port-forward.png)
 
@@ -382,8 +370,8 @@ Le site répond sur `http://127.0.0.1:9090`, uniquement depuis le poste qui a la
 
 **Retour en LoadBalancer :** relancer le même `helm upgrade` **sans** le `--set`.
 
-> Choix : `--set` plutôt qu'un fichier `values-gke.yaml`, car **une seule** valeur diffère, et
-> seulement pendant la phase de test.
+**Choix :** `--set` plutôt qu'un fichier `values-gke.yaml`, car **une seule** valeur diffère, et
+seulement pendant la phase de test.
 
 ---
 
@@ -400,7 +388,7 @@ kubectl get pvc -n <ENV>
 | prod | `true` | PVC **conservé** → messages conservés |
 
 `keep: true` ajoute sur le PVC l'annotation **`helm.sh/resource-policy: keep`** (template
-`redis-leader-pvc.yaml`). Helm ne supprime pas un objet qui porte cette annotation.
+`redis-leader-pvc.yaml`).
 
 ### Réutiliser le disque de prod
 
@@ -412,8 +400,8 @@ helm install stack-prod helm/guestbook -n prod -f helm/guestbook/values-prod.yam
 
 ![message de prod après réinstallation](screenshots/46-keep-prod-message-apres-reinstall.png)
 
-La nouvelle release crée un PVC **du même nom** : Kubernetes rebranche le disque existant, les
-messages réapparaissent. Seule l'adresse du site change (le Service a été recréé).
+La nouvelle release crée un PVC **du même nom** : le disque existant est rebranché, les messages
+réapparaissent. Seule l'adresse du site change.
 
 > **Supprimer vraiment les données de prod :**
 > `kubectl delete pvc stack-prod-guestbook-redis-leader-data -n prod` après le `helm uninstall`.

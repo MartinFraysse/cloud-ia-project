@@ -2,10 +2,10 @@
 
 ## Objectif
 
-Installer l'application **telle qu'elle était à l'origine**, puis **reproduire le problème du
-client** : après un redémarrage de la base, tous les messages disparaissent.
+Installer l'application **d'origine** et **reproduire le problème du client** : après un
+redémarrage de la base, tous les messages disparaissent.
 
-C'est l'état « **avant** ». Les parties suivantes corrigent ce qu'on observe ici.
+C'est l'état « **avant** ». Les parties suivantes le corrigent.
 
 > Cette partie se fait sur le **cluster local** (minikube), préparé en
 > [partie 1](01-preparation-poste.md).
@@ -14,7 +14,7 @@ C'est l'état « **avant** ». Les parties suivantes corrigent ce qu'on observe 
 
 ## Étape 2.1 — Les fichiers d'origine
 
-Les fichiers du tutoriel officiel sont rangés **sans aucune modification** dans le dépôt :
+Les fichiers du tutoriel officiel sont copiés **sans modification** dans le dépôt :
 
 ```
 Project-2/k8s/tutoriel-origine/
@@ -27,39 +27,21 @@ Project-2/k8s/tutoriel-origine/
 └── redis-follower-service.yaml      → le nom réseau des copies
 ```
 
-Ils servent à deux choses :
-
-1. reproduire le problème ;
-2. comparer avec nos fichiers améliorés (parties 3 et 4).
+Ils servent à reproduire le problème et à comparer avec nos fichiers (parties 3 et 4).
 
 > ⚠️ Ces fichiers ne sont **pas** utilisés pour `dev`, `staging` ou `prod`.
-
-### Trois mots à connaître
-
-| Mot | Définition simple |
-|---|---|
-| **Pod** | Un programme qui tourne dans le cluster (ex. : la base de données) |
-| **Deployment** | La consigne « garde ce programme allumé ». Si le pod disparaît, il en recrée un. |
-| **Service** | Un nom et une adresse fixes pour joindre un pod, même s'il est recréé |
 
 ---
 
 ## Étape 2.2 — Installer l'application d'origine
 
-On l'installe dans un **namespace** à part, `tuto`. Un namespace est un espace isolé : tout ce
-qui est dedans se supprime en une commande à la fin.
+On l'installe dans un namespace à part, `tuto`, supprimé à la fin.
 
 ```bash
 kubectl config current-context        # doit afficher : minikube
 kubectl create namespace tuto
 kubectl apply -n tuto -f Project-2/k8s/tutoriel-origine/
 ```
-
-| Commande | Ce qu'elle fait |
-|---|---|
-| `kubectl config current-context` | Vérifie qu'on travaille bien sur le cluster **local** |
-| `kubectl create namespace tuto` | Crée l'espace isolé `tuto` |
-| `kubectl apply -n tuto -f <dossier>` | Crée tous les objets décrits dans les fichiers `.yaml` du dossier |
 
 ![Installation de l'application d'origine](screenshots/04-deploiement-tutoriel-origine.png)
 
@@ -83,8 +65,6 @@ kubectl get all -n tuto
 | Service `frontend` | Type `LoadBalancer`, `EXTERNAL-IP <pending>` (normal à ce stade) |
 | Services `redis-*` | Type `ClusterIP` : joignables **seulement** depuis l'intérieur du cluster |
 
-**Comment les objets s'enchaînent :**
-
 ```mermaid
 flowchart LR
     D["📦 <b>Deployment</b><br/>frontend"] ==>|crée| RS["📋 <b>ReplicaSet</b><br/>frontend-88dcd974c"]
@@ -100,15 +80,12 @@ flowchart LR
     class P1,P2,P3 pod
 ```
 
-Le Deployment crée un ReplicaSet, qui crée les pods. D'où les noms en plusieurs morceaux :
-`frontend-88dcd974c-b4hsx` = nom du Deployment + identifiant du ReplicaSet + identifiant du pod.
-
 ---
 
 ## Étape 2.4 — Accéder au site web
 
-Le Service `frontend` est de type `LoadBalancer` : il attend une adresse externe.
-Dans le cloud, Google la fournit. **En local, c'est `minikube tunnel` qui joue ce rôle.**
+Le Service `frontend` est de type `LoadBalancer`. En local, `minikube tunnel` fournit
+l'adresse externe.
 
 Dans un **terminal dédié**, à laisser ouvert :
 
@@ -116,7 +93,7 @@ Dans un **terminal dédié**, à laisser ouvert :
 minikube tunnel
 ```
 
-La commande demande le mot de passe `sudo` (elle modifie le réseau du poste).
+La commande demande le mot de passe `sudo`.
 
 ![minikube tunnel actif](screenshots/06-minikube-tunnel.png)
 
@@ -130,20 +107,16 @@ kubectl get svc frontend -n tuto
 
 ![Adresse externe du site](screenshots/07-ip-externe-frontend.png)
 
-L'adresse est dans la colonne **`EXTERNAL-IP`** (ici `10.105.199.2`).
+L'adresse est dans la colonne **`EXTERNAL-IP`** (ici `10.105.199.2`). Elle dépend du système :
 
-> 💡 **L'adresse dépend du système :**
->
-> | Système | `EXTERNAL-IP` |
-> |---|---|
-> | Linux | Une IP du cluster (ex. `10.105.199.2`) |
-> | macOS / Windows (Docker Desktop) | `127.0.0.1` |
+| Système | `EXTERNAL-IP` |
+|---|---|
+| Linux | Une IP du cluster (ex. `10.105.199.2`) |
+| macOS / Windows (Docker Desktop) | `127.0.0.1` |
 
 Ouvrir **http://10.105.199.2** dans le navigateur, puis écrire quelques messages :
 
 ![Le livre d'or avec 3 messages](screenshots/08-messages-avant-suppression.png)
-
-**Ce qui se passe derrière :**
 
 ```mermaid
 flowchart LR
@@ -166,19 +139,15 @@ flowchart LR
 
 ## Étape 2.5 — Reproduire le problème
 
-On supprime le pod de la base principale. Cela simule une panne, un redémarrage ou une mise à
-jour.
+On supprime le pod de la base principale pour simuler une panne ou un redémarrage.
 
 ```bash
 kubectl delete pod -n tuto -l role=leader
 ```
 
-`-l role=leader` choisit le pod par son **étiquette** (label), sans avoir à taper son nom complet.
-
 ![Suppression du pod redis-leader](screenshots/09-suppression-pod-leader.png)
 
-Le Deployment remarque qu'il manque un pod et **en recrée un neuf**.
-On attend qu'il soit prêt :
+Le Deployment recrée un pod. On attend qu'il soit prêt :
 
 ```bash
 kubectl get pods -n tuto -w      # Ctrl+C quand le nouveau redis-leader est "Running"
@@ -190,7 +159,7 @@ Puis on **recharge la page** :
 
 ### 💥 Résultat : tous les messages ont disparu
 
-C'est **exactement** le problème rencontré par le client.
+C'est le problème rencontré par le client.
 
 ---
 
@@ -211,19 +180,18 @@ sequenceDiagram
 ```
 
 1. Redis garde les messages **en mémoire uniquement**.
-2. Le pod est recréé **à partir de l'image** : il démarre avec une mémoire vide.
-3. Les copies (`redis-follower`) se resynchronisent sur la nouvelle base… et deviennent vides
-   elles aussi.
+2. Le nouveau pod démarre avec une mémoire vide.
+3. Les `redis-follower` se resynchronisent sur ce leader vide et deviennent vides aussi.
 
-> **Conclusion :** il faut que la **base principale** retrouve ses données au redémarrage.
-> Il lui faut un **disque qui survit au pod**. C'est l'objet de la partie 4.
+> **Conclusion :** la base principale a besoin d'un **disque qui survit au pod**. C'est
+> l'objet de la partie 4.
 
 ---
 
 ## Ce qui manque aux fichiers d'origine
 
-En lisant les fichiers du tutoriel, on relève 6 points à corriger.
-Les numéros de ligne renvoient aux fichiers de `Project-2/k8s/tutoriel-origine/`.
+On relève 6 points à corriger. Les numéros de ligne renvoient aux fichiers de
+`Project-2/k8s/tutoriel-origine/`.
 
 | # | Ce qui manque | Où on le voit | Risque | Corrigé en |
 |---|---|---|---|---|
@@ -252,11 +220,9 @@ Les numéros de ligne renvoient aux fichiers de `Project-2/k8s/tutoriel-origine/
       # ❌ pas de fichier redis.conf : Redis n'écrit rien sur disque
 ```
 
-Le conteneur n'a **aucun disque**. Tout est en mémoire, donc perdu quand le pod est recréé.
-
 ### ② Aucun contrôle de santé — les 3 Deployments
 
-Exemple dans `frontend-deployment.yaml` :
+Exemple dans `frontend-deployment.yaml` (même constat pour les deux Deployments Redis) :
 
 ```yaml
       containers:
@@ -269,8 +235,6 @@ Exemple dans `frontend-deployment.yaml` :
         # ❌ pas de "livenessProbe"  : un programme bloqué n'est jamais redémarré
 ```
 
-Même constat dans `redis-leader-deployment.yaml` et `redis-follower-deployment.yaml`.
-
 ### ③ Pas de limites de ressources — les 3 Deployments
 
 ```yaml
@@ -281,9 +245,6 @@ Même constat dans `redis-leader-deployment.yaml` et `redis-follower-deployment.
                              # ❌ pas de "limits" : aucun plafond
 ```
 
-Les `requests` réservent des ressources, mais **sans `limits`**, rien n'empêche un programme
-de consommer toute la mémoire ou tout le processeur du nœud.
-
 ### ④ Réglage écrit dans le Deployment — `frontend-deployment.yaml`, l. 36-38
 
 ```yaml
@@ -292,8 +253,7 @@ de consommer toute la mémoire ou tout le processeur du nœud.
           value: "dns"
 ```
 
-Pour changer ce réglage, il faut modifier le Deployment lui-même. Les réglages doivent être
-dans un objet séparé : une **ConfigMap**.
+Ce réglage doit être dans une **ConfigMap**.
 
 ### ⑤ Étiquettes non standard — tous les fichiers
 
@@ -304,9 +264,8 @@ dans un objet séparé : une **ConfigMap**.
     tier: backend
 ```
 
-Kubernetes recommande des étiquettes standard : `app.kubernetes.io/name`,
-`app.kubernetes.io/component`, `app.kubernetes.io/part-of`… Elles sont reconnues par les
-outils (Helm, tableaux de bord) et identiques d'un projet à l'autre.
+À remplacer par les étiquettes recommandées : `app.kubernetes.io/name`,
+`app.kubernetes.io/component`, `app.kubernetes.io/part-of`…
 
 ### ⑥ Même sélecteur pour leader et followers
 
@@ -326,10 +285,8 @@ outils (Helm, tableaux de bord) et identiques d'un projet à l'autre.
       app: redis        # ❌ exactement le même sélecteur
 ```
 
-Le **sélecteur** indique à un Deployment quels pods lui appartiennent. Ici, les deux
-Deployments revendiquent les mêmes pods `app: redis` : leader et copies ne sont pas
-clairement séparés. Le sélecteur doit inclure le rôle (`component: redis-leader` /
-`redis-follower`).
+Les deux Deployments sélectionnent les mêmes pods `app: redis`. Le sélecteur doit inclure le
+rôle (`component: redis-leader` / `redis-follower`).
 
 ---
 
@@ -339,8 +296,7 @@ clairement séparés. Le sélecteur doit inclure le rôle (`component: redis-lea
 kubectl delete namespace tuto
 ```
 
-Supprime le namespace **et tout ce qu'il contient**. Fermer ensuite le terminal de
-`minikube tunnel` (`Ctrl+C`).
+Fermer ensuite le terminal de `minikube tunnel` (`Ctrl+C`).
 
 ---
 

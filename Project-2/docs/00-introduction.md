@@ -2,19 +2,15 @@
 
 ## Le contexte
 
-**Cloud Hôtels** est un groupe d'une quarantaine d'hôtels.
-Il propose à ses clients un **livre d'or numérique** :
+**Cloud Hôtels** (une quarantaine d'hôtels) propose un **livre d'or numérique**.
+En fin de séjour, le client écrit un message. Le message s'affiche dans le hall de l'hôtel.
 
-- à la fin du séjour, le client écrit un message ;
-- le message s'affiche en direct dans le hall de l'hôtel.
-
-Un premier prototype existait. Il a été installé à la main sur un poste.
-**Problème :** lors d'une démonstration, un redémarrage a **effacé tous les messages**.
+Le premier prototype était installé à la main sur un poste.
+Lors d'une démonstration, un redémarrage a **effacé tous les messages**.
 
 ## L'application
 
-L'application s'appelle **Guestbook**. C'est un exemple officiel de Kubernetes.
-Elle a **3 composants** :
+L'application est **Guestbook**, un exemple officiel de Kubernetes. Elle a **3 composants** :
 
 ```mermaid
 flowchart LR
@@ -35,9 +31,9 @@ flowchart LR
 
 | Composant | Rôle |
 |---|---|
-| **frontend** | Le site web. Il affiche les messages et enregistre les nouveaux. |
-| **redis-leader** | La base de données principale. Elle **reçoit les écritures**. |
-| **redis-follower** | Des copies de la base. Elles servent **les lectures**. |
+| **frontend** | Site web PHP : affiche et enregistre les messages |
+| **redis-leader** | Base principale : reçoit **les écritures** |
+| **redis-follower** | Copies de la base : servent **les lectures** |
 
 ## Les objectifs du projet
 
@@ -49,14 +45,6 @@ flowchart LR
 | 4 | **3 environnements isolés** : `dev`, `staging`, `prod` | Un seul chart Helm, des réglages différents |
 | 5 | **Pouvoir travailler en local** | minikube, avec le même chart que dans le cloud |
 | 6 | **Aucun réglage écrit en dur** | ConfigMaps et fichiers de valeurs Helm |
-
-## Les trois outils principaux
-
-| Outil | Rôle dans le projet |
-|---|---|
-| **Kubernetes** | Fait tourner l'application et la relance en cas de panne |
-| **Helm** | Installe l'application dans Kubernetes à partir d'un modèle (*chart*) |
-| **Terraform** | Crée le cluster Kubernetes dans Google Cloud |
 
 > **Règle de base :** Terraform crée le cluster. Helm installe l'application dedans.
 > Les deux outils ne se chevauchent jamais.
@@ -87,7 +75,7 @@ flowchart TB
     class MK,GKE cluster
 ```
 
-Dans chaque cluster, on installe l'application **3 fois**, une par environnement :
+Dans chaque cluster, l'application est installée **3 fois**, une par environnement (un namespace chacun) :
 
 | Environnement | Rôle | Namespace | Installation Helm |
 |---|---|---|---|
@@ -95,10 +83,7 @@ Dans chaque cluster, on installe l'application **3 fois**, une par environnement
 | **staging** | Répétition avant la production | `staging` | `stack-staging` |
 | **prod** | Utilisé par les clients | `prod` | `stack-prod` |
 
-> Un **namespace** est un espace isolé dans le cluster.
-> Un message écrit en `dev` n'apparaît jamais en `prod`.
-
-## Ce qui est automatisé, et ce qui ne l'est pas
+## Automatisé ou manuel
 
 | ✅ Automatisé (code dans le dépôt) | ✋ Manuel (documenté ici) |
 |---|---|
@@ -111,10 +96,10 @@ Dans chaque cluster, on installe l'application **3 fois**, une par environnement
 
 ```
 Project-2/
-├── docs/          → cette documentation et les captures d'écran
-├── k8s/           → les fichiers Kubernetes de base (partie 3 et 4)
-├── helm/          → le chart Helm (partie 5 et 6)
-└── terraform/     → la création du cluster GKE (partie 7)
+├── docs/          → documentation et captures d'écran
+├── k8s/           → manifestes Kubernetes de base (parties 3 et 4)
+├── helm/          → chart Helm (parties 5 et 6)
+└── terraform/     → création du cluster GKE (partie 7)
 ```
 
 ---
