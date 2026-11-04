@@ -32,6 +32,27 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 | 25 | `25-redemarrage-minikube-pods.png` | 04-reparer-le-bug | Redémarrage complet de minikube : les 5 pods reviennent `1/1 Running` |
 | 26 | `26-redis-get-apres-redemarrage-minikube.png` | 04-reparer-le-bug | Après le redémarrage complet : les 3 messages sont toujours là |
 | 27 | `27-helm-lint-chart.png` | 05-recette-helm | `helm lint` du chart : 0 échec |
+| 28 | `28-helm-lint-install-environnements.png` | 06-trois-environnements | `helm lint` + `helm install` de dev, staging et prod : 3 releases `deployed` |
+| 29 | `29-helm-list-trois-releases.png` | 06-trois-environnements | `helm list -A` : 3 releases (dev, staging, prod) en révision 1 |
+| 30 | `30-kubectl-get-all-prod.png` | 06-trois-environnements | contenu du namespace `prod` : 3 frontends, 2 followers, 1 leader, PVC 5Gi `Bound` |
+| 31 | `31-kubectl-get-all-dev.png` | 06-trois-environnements | contenu du namespace `dev` après nettoyage : 1 pod par composant, port 8080, PVC 1Gi |
+| 32 | `32-kubectl-get-all-staging.png` | 06-trois-environnements | contenu du namespace `staging` : 2 frontends, port 8081, PVC 1Gi |
+| 33 | `33-minikube-tunnel-ip-trois-environnements.png` | 06-trois-environnements | `minikube tunnel` + `EXTERNAL-IP` des 3 frontends (ports 8080 / 8081 / 80) |
+| 34 | `34-values-staging-replicas-3.png` | 06-trois-environnements | `values-staging.yaml` : `frontend.replicaCount` passé de 2 à 3 |
+| 35 | `35-helm-upgrade-staging-replicas.png` | 06-trois-environnements | `helm upgrade stack-staging` : révision 3, frontend 3 pods sans toucher aux templates |
+| 36 | `36-idempotence-prod-pods-avant.png` | 06-trois-environnements | idempotence (1/4) : pods de `prod` **avant** l'upgrade |
+| 37 | `37-idempotence-prod-helm-upgrade.png` | 06-trois-environnements | idempotence (2/4) : `helm upgrade stack-prod` sans changement → révision 2 |
+| 38 | `38-idempotence-prod-pods-apres.png` | 06-trois-environnements | idempotence (3/4) : pods de `prod` **après** : les mêmes, aucun recréé |
+| 39 | `39-idempotence-prod-helm-history.png` | 06-trois-environnements | idempotence (4/4) : `helm history stack-prod` : révisions 1 et 2 |
+| 40 | `40-upgrade-version-prod-rolling-update.png` | 06-trois-environnements | montée du chart en 0.2.0 (1/3) : `kubectl get pods -n prod -w`, remplacement de tous les pods |
+| 41 | `41-upgrade-version-prod-helm-history.png` | 06-trois-environnements | montée du chart en 0.2.0 (2/3) : `helm history` → révision 3, `guestbook-0.2.0` |
+| 42 | `42-upgrade-version-prod-message-conserve.png` | 06-trois-environnements | montée du chart en 0.2.0 (3/3) : « Voici la prod » toujours affiché |
+| 43 | `43-helm-rollback-prod-history.png` | 06-trois-environnements | `helm rollback stack-prod 1` : retour au chart 0.1.0 (révisions 4 et 5) |
+| 44 | `44-helm-upgrade-dev-clusterip-port-forward.png` | 06-trois-environnements | `--set frontend.service.type=ClusterIP` sur dev + `kubectl port-forward` |
+| 45 | `45-site-dev-via-port-forward.png` | 06-trois-environnements | site de dev ouvert par le port-forward (`127.0.0.1:9090`) |
+| 46 | `46-keep-prod-message-apres-reinstall.png` | 06-trois-environnements | bonus `keep` : « Je suis la prod » réapparaît après `helm uninstall` + `helm install` |
+| 47 | `47-helm-rollback-prod-0-3-0-history.png` | 06-trois-environnements | montée en 0.3.0 puis `helm rollback stack-prod 1` : historique |
+| 48 | `48-helm-rollback-prod-message-conserve.png` | 06-trois-environnements | message de prod toujours là après le rollback |
 
 ---
 
@@ -529,4 +550,376 @@ Convention de nommage : `NN-sujet-court.png` (NN = ordre chronologique).
 - **Remarque :** `[INFO] Chart.yaml: icon is recommended` est une simple suggestion (une icône
   pour un catalogue de charts), sans conséquence. Le lint avec `-f values-<ENV>.yaml` sera fait
   en partie 6, quand ces fichiers existeront.
+
+---
+
+## 28 — `helm lint` et `helm install` des 3 environnements
+
+- **Fichier :** `28-helm-lint-install-environnements.png` (2 captures du terminal assemblées)
+- **Date :** 2026-11-04
+- **Branche :** `feat/p2-environnements-helm`
+- **Commande :** depuis `Project-2/`, une boucle sur les 3 environnements :
+  `for env in dev staging prod; do helm lint helm/guestbook -f helm/guestbook/values-$env.yaml; helm install stack-$env helm/guestbook/ --namespace $env --create-namespace -f helm/guestbook/values-$env.yaml; done`
+- **Ce qu'on voit :** pour chaque environnement, `1 chart(s) linted, 0 chart(s) failed`, puis
+  `STATUS: deployed`, `REVISION: 1`, `Install complete` pour `stack-dev` (namespace `dev`),
+  `stack-staging` (`staging`) et `stack-prod` (`prod`), chart `guestbook-0.1.0`. Les NOTES donnent
+  le port de chaque environnement : `:8080`, `:8081`, `:80`.
+- **À retenir :** **une seule recette, installée 3 fois** ; seul le fichier `-f values-<ENV>.yaml`
+  change. Le lint valide le chart avec les valeurs de chaque environnement (H1), et les NOTES
+  confirment que la surcharge du port a bien été prise en compte.
+- **Remarque :** un premier essai avait échoué (`cluster unreachable … no route to host`) car
+  minikube était arrêté : `kubectl config current-context` dit **quel** cluster est visé, pas s'il
+  est allumé → `minikube start` / `minikube status` d'abord.
+
+---
+
+## 29 — `helm list -A` : les 3 releases
+
+- **Fichier :** `29-helm-list-trois-releases.png`
+- **Date :** 2026-11-04
+- **Branche :** `feat/p2-environnements-helm`
+- **Commande :** `helm list -A` (`-A` = tous les namespaces)
+- **Ce qu'on voit :** 3 releases, chacune dans son namespace : `stack-dev` → `dev`,
+  `stack-staging` → `staging`, `stack-prod` → `prod`. Toutes en `REVISION 1`, `STATUS deployed`,
+  `CHART guestbook-0.1.0`, `APP VERSION v5`.
+- **À retenir :** le **même** chart (`guestbook-0.1.0`) est installé 3 fois, séparément. Chaque
+  release a son propre historique (révision 1 = première installation) : on pourra mettre à jour
+  ou revenir en arrière sur un environnement sans toucher aux autres.
+- **Remarque :** `CHART` = version de la recette (`version` du `Chart.yaml`) ; `APP VERSION` =
+  version de l'application (`appVersion`, ici le tag `v5` de l'image du frontend).
+
+---
+
+## 30 — Contenu du namespace `prod`
+
+- **Fichier :** `30-kubectl-get-all-prod.png`
+- **Date :** 2026-11-04
+- **Branche :** `feat/p2-environnements-helm`
+- **Commande :** `kubectl get all,cm,pvc -n prod`
+- **Ce qu'on voit :**
+  - **Pods** : 3 `frontend`, 2 `redis-follower`, 1 `redis-leader`, tous `1/1 Running`, 0 redémarrage.
+  - **Services** : `frontend` en `LoadBalancer` sur le **port 80** (`EXTERNAL-IP <pending>` : pas
+    encore de `minikube tunnel`) ; `redis-leader` et `redis-follower` en `ClusterIP` sur 6379.
+  - **Deployments** : `frontend 3/3`, `redis-follower 2/2`, `redis-leader 1/1`.
+  - **ConfigMaps** : `frontend` (3 clés : `GET_HOSTS_FROM` + les 2 adresses Redis),
+    `redis-follower` (2), `redis-leader` (1 : `redis.conf`). `kube-root-ca.crt` est créé par
+    Kubernetes dans chaque namespace (âge 37h = création du namespace).
+  - **PVC** : `stack-prod-guestbook-redis-leader-data`, `Bound`, **5Gi**, `RWO`, StorageClass
+    `standard` (celle par défaut de minikube).
+- **À retenir :** les surcharges de `values-prod.yaml` sont bien appliquées (3 frontends,
+  2 followers, disque de 5Gi, port 80). Tous les noms commencent par `stack-prod-guestbook-` :
+  préfixe de la release, donc aucun conflit avec dev ou staging.
+
+---
+
+## 31 — Contenu du namespace `dev` (après nettoyage)
+
+- **Fichier :** `31-kubectl-get-all-dev.png`
+- **Date :** 2026-11-04
+- **Branche :** `feat/p2-environnements-helm`
+- **Commande :** `kubectl get all,cm,pvc -n dev`
+- **Ce qu'on voit :**
+  - **Pods** : 1 `frontend`, 1 `redis-follower`, 1 `redis-leader`, tous `1/1 Running`.
+  - **Services** : `frontend` en `LoadBalancer` sur le **port 8080** (`EXTERNAL-IP <pending>` :
+    pas encore de `minikube tunnel`) ; Redis en `ClusterIP` sur 6379.
+  - **ConfigMaps** : les 3 du chart + `kube-root-ca.crt` (créé par Kubernetes).
+  - **PVC** : `stack-dev-guestbook-redis-leader-data`, `Bound`, **1Gi**, `RWO`, `standard`.
+- **À retenir :** il ne reste **que** la release Helm `stack-dev`. L'ancienne application des
+  étapes 3-4 (objets sans préfixe : `frontend`, `redis-leader`…, installés par `kubectl apply -f
+  k8s/`) a été supprimée avant, avec `kubectl delete -n dev -f` sur chaque fichier de `k8s/` sauf
+  `namespaces.yaml`, puis le PV resté `Released`. Dev garde les valeurs par défaut sauf le port
+  (8080) et le label `environment`.
+
+---
+
+## 32 — Contenu du namespace `staging`
+
+- **Fichier :** `32-kubectl-get-all-staging.png`
+- **Date :** 2026-11-04
+- **Branche :** `feat/p2-environnements-helm`
+- **Commande :** `kubectl get all,cm,pvc -n staging`
+- **Ce qu'on voit :**
+  - **Pods** : 2 `frontend`, 1 `redis-follower`, 1 `redis-leader`, tous `1/1 Running`.
+  - **Services** : `frontend` en `LoadBalancer` sur le **port 8081** ; Redis en `ClusterIP` sur 6379.
+  - **Deployments** : `frontend 2/2`, `redis-follower 1/1`, `redis-leader 1/1`.
+  - **PVC** : `stack-staging-guestbook-redis-leader-data`, `Bound`, **1Gi**, `RWO`, `standard`.
+- **À retenir :** surcharges de `values-staging.yaml` appliquées : 2 frontends (pour pouvoir
+  tester une mise à jour sans coupure) et port 8081. Avec les captures 30 (prod) et 31 (dev) :
+  **même chart, 3 tailles différentes** (frontends 1 / 2 / 3, disque 1Gi / 1Gi / 5Gi, ports
+  8080 / 8081 / 80).
+
+---
+
+## 33 — `minikube tunnel` et les adresses des 3 environnements
+
+- **Fichier :** `33-minikube-tunnel-ip-trois-environnements.png`
+- **Date :** 2026-11-04
+- **Branche :** `feat/p2-environnements-helm`
+- **Commandes :** en bas, `minikube tunnel` (terminal dédié, laissé ouvert, demande le mot de
+  passe `sudo`) ; en haut, `kubectl get svc -A | grep frontend`.
+- **Ce qu'on voit :**
+  - **Tunnel** : `minikube: Running`, route `10.96.0.0/12 -> 192.168.49.2`, et les 3 Services
+    servis : `stack-dev-…`, `stack-prod-…`, `stack-staging-guestbook-frontend` ; aucune erreur.
+  - **Adresses** (colonne `EXTERNAL-IP`, plus de `<pending>`) :
+
+    | Env | EXTERNAL-IP | Port | URL |
+    |---|---|---|---|
+    | dev | `10.110.15.78` | 8080 | `http://10.110.15.78:8080` |
+    | staging | `10.106.111.203` | 8081 | `http://10.106.111.203:8081` |
+    | prod | `10.96.10.135` | 80 | `http://10.96.10.135` |
+- **À retenir :** le tunnel joue le rôle du « fournisseur de LoadBalancer » qu'aurait un cloud. Il
+  ajoute sur le PC une route vers le réseau des Services (`10.96.0.0/12`) via la machine minikube
+  (`192.168.49.2`). **Sous Linux**, chaque Service reçoit **sa propre IP** (ici égale à sa
+  `CLUSTER-IP`) ; sous macOS / Windows ce serait `127.0.0.1` pour les 3, d'où des ports différents
+  imposés par l'énoncé. Adresse du site = `EXTERNAL-IP` + **premier** port de `PORT(S)` (le
+  second, `31225`…, est le NodePort interne).
+
+---
+
+## 34 — Modification d'une valeur de staging
+
+- **Fichier :** `34-values-staging-replicas-3.png`
+- **Date :** 2026-11-04
+- **Branche :** `feat/p2-environnements-helm`
+- **Action :** dans l'éditeur, `helm/guestbook/values-staging.yaml`, ligne 7 :
+  `frontend.replicaCount` passe de `2` à **`3`**.
+- **Ce qu'on voit :** le fichier de staging ne contient que ses surcharges (`environment`, `team`,
+  `replicaCount`, `port: 8081`). Aucun template n'est modifié.
+- **À retenir :** c'est la vérification de l'exigence H3 (`enonce/HELM.md`) : on change **une
+  valeur** dans le fichier de l'environnement, puis `helm upgrade` (capture 35). Valeur remise
+  ensuite par `helm rollback` ou en remettant `2`.
+
+---
+
+## 35 — `helm upgrade` de staging : 3 frontends
+
+- **Fichier :** `35-helm-upgrade-staging-replicas.png`
+- **Date :** 2026-11-04
+- **Branche :** `feat/p2-environnements-helm`
+- **Commandes :** `helm upgrade stack-staging helm/guestbook -n staging -f helm/guestbook/values-staging.yaml`
+  puis `kubectl get deploy -n staging`.
+- **Ce qu'on voit :** `has been upgraded`, `STATUS: deployed`, **`REVISION: 3`**, `Upgrade complete`.
+  Le Deployment frontend affiche `2/3 READY`, `3 UP-TO-DATE` : le 3ᵉ pod vient d'être créé et
+  démarre (readiness probe). Vérifié juste après : `3/3`, nouveau pod de 36 s à côté des deux
+  anciens (34 min), leader et follower **non touchés**.
+- **À retenir :**
+  - Helm compare l'ancien et le nouveau résultat et n'applique **que la différence** : seul le
+    nombre de pods du frontend change, aucun pod existant n'est recréé.
+  - Révision 2 = upgrade précédent **sans changement** (valeurs identiques à la révision 1,
+    vérifié avec `helm get values --revision`) → idempotence : rien n'a bougé dans le cluster.
+  - Historique (`helm history stack-staging -n staging`) : 1 `Install complete`, 2 et 3
+    `Upgrade complete`, la 3 est `deployed`, les autres `superseded`.
+
+---
+
+## 36 à 39 — Test d'idempotence en `prod`
+
+**But :** montrer qu'un `helm upgrade` **sans aucun changement** (mêmes valeurs, même chart) ne
+touche à rien dans le cluster. Les 4 captures se lisent dans l'ordre.
+
+### 36 — Pods de `prod` avant l'upgrade
+
+- **Fichier :** `36-idempotence-prod-pods-avant.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Commande :** `kubectl get pods -n prod`
+- **Ce qu'on voit :** 3 frontends `…-55fc467fb8-…` (37m), 2 followers `…-5db7bc565b-…` (37m),
+  1 leader `…-784fdc6b4d-m4qrk` (11m : recréé lors du test de persistance). Tous `Running`,
+  0 redémarrage.
+
+### 37 — `helm upgrade` sans changement
+
+- **Fichier :** `37-idempotence-prod-helm-upgrade.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Commande :** `helm upgrade stack-prod helm/guestbook/ -n prod -f helm/guestbook/values-prod.yaml`
+- **Ce qu'on voit :** `has been upgraded`, `STATUS: deployed`, **`REVISION: 2`**,
+  `Upgrade complete`, chart `guestbook-0.1.0` (inchangé).
+
+### 38 — Pods de `prod` après l'upgrade
+
+- **Fichier :** `38-idempotence-prod-pods-apres.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Commande :** `kubectl get pods -n prod`
+- **Ce qu'on voit :** **exactement les mêmes pods** que sur la capture 36 : mêmes noms (même
+  suffixe de ReplicaSet `55fc467fb8` / `5db7bc565b` / `784fdc6b4d`, mêmes suffixes de pod), âges
+  qui continuent (37m → 43m, 11m → 16m), 0 redémarrage.
+
+### 39 — Historique de la release
+
+- **Fichier :** `39-idempotence-prod-helm-history.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Commande :** `helm history stack-prod -n prod`
+- **Ce qu'on voit :** révision 1 `superseded` / `Install complete`, révision 2 `deployed` /
+  `Upgrade complete`, même chart `guestbook-0.1.0`, même `APP VERSION v5`.
+
+**À retenir (36 → 39) :** Helm a bien enregistré une **nouvelle révision** (trace de l'action
+dans l'historique), mais comme le YAML produit est identique, Kubernetes n'a **rien** modifié :
+aucun pod recréé, aucun redémarrage. Relancer la même commande est donc **sans danger** :
+c'est l'idempotence.
+
+---
+
+## 40 à 42 — Mise à jour de la version du chart en `prod`
+
+**But :** vérifier qu'une **vraie** mise à jour (nouvelle version du chart) remplace les pods
+**sans coupure** et **sans perte de messages**. Action préalable : dans `Chart.yaml`,
+`version: 0.1.0` → **`0.2.0`**, puis
+`helm upgrade stack-prod helm/guestbook/ -n prod -f helm/guestbook/values-prod.yaml`.
+
+### 40 — Remplacement des pods (`kubectl get pods -n prod -w`)
+
+- **Fichier :** `40-upgrade-version-prod-rolling-update.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Commande :** `kubectl get pods -n prod -w` (lancée pendant l'upgrade)
+- **Ce qu'on voit :**
+  - **Nouveaux ReplicaSets** (nouveau hash) pour les 3 composants : frontend `55fc467fb8` →
+    `79d5658bc9`, follower `5db7bc565b` → `758fb5fb67`, leader `784fdc6b4d` → `978ff4875`.
+    Cause : le label `helm.sh/chart: guestbook-<version>` est dans le gabarit des pods → il
+    change → Kubernetes considère que c'est une nouvelle version des pods.
+  - **Frontend et follower = RollingUpdate** : un nouveau pod passe `0/1` → `1/1` (~12 s,
+    readiness probe) **avant** qu'un ancien passe `Terminating`. Le cycle se répète pour chaque
+    pod → toujours des pods prêts, **pas de coupure**.
+  - **Leader = Recreate** : l'ancien leader (`m4qrk`) n'apparaît déjà plus au début de la liste ;
+    il a été arrêté **avant** la création du nouveau (`978ff4875-gjvz6`), car le disque
+    `ReadWriteOnce` ne se branche qu'à un seul Redis.
+  - **Anciens frontends → `Completed`** : Apache est le processus n°1 du conteneur, il reçoit
+    l'ordre d'arrêt (SIGTERM) et sort proprement (code 0).
+  - **Anciens followers → `Error`** : dans l'image Google, le processus n°1 est
+    `/bin/sh -c /run.sh`, qui lance `redis-server`. Le SIGTERM arrive à `sh`, qui l'ignore (un
+    processus n°1 ignore les signaux qu'il ne traite pas) et ne le transmet pas à Redis →
+    au bout du délai de grâce (30 s) Kubernetes force l'arrêt (SIGKILL, code 137) → `Error`.
+    **Sans conséquence** : le follower n'a pas de données propres et son remplaçant était déjà
+    prêt.
+
+### 41 — Historique : révision 3 en `guestbook-0.2.0`
+
+- **Fichier :** `41-upgrade-version-prod-helm-history.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Commande :** `helm history stack-prod -n prod`
+- **Ce qu'on voit :** 1 `Install complete` (0.1.0), 2 `Upgrade complete` (0.1.0, test
+  d'idempotence, captures 36-39), **3 `deployed` / `Upgrade complete` avec `guestbook-0.2.0`**.
+  `APP VERSION` reste `v5` : on a changé la version de la **recette**, pas celle de l'application.
+
+### 42 — Le message de prod est toujours là
+
+- **Fichier :** `42-upgrade-version-prod-message-conserve.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Action :** ouvrir `http://10.96.10.135` (prod) après l'upgrade.
+- **Ce qu'on voit :** « Voici la prod » est toujours affiché.
+- **À retenir (40 → 42) :** tous les pods ont été remplacés, y compris le Redis leader, mais le
+  message a survécu : il est sur le **PVC**, que l'upgrade ne touche pas. Le nouveau leader a
+  remonté le même disque et relu son journal AOF.
+
+---
+
+## 43 — `helm rollback` de `prod` vers la révision 1
+
+- **Fichier :** `43-helm-rollback-prod-history.png`
+- **Date :** 2026-11-04
+- **Branche :** `feat/p2-environnements-helm`
+- **Commandes :** `helm rollback stack-prod 1 -n prod` puis `helm history stack-prod -n prod`
+- **Ce qu'on voit :** `Rollback was a success!`. Historique : 1 `Install complete` (0.1.0),
+  2 `Upgrade complete` (0.1.0), 3 `Upgrade complete` (**0.2.0**), **4 `Rollback to 1` (0.1.0)**,
+  **5 `Rollback to 1` (0.1.0, `deployed`)**.
+- **À retenir :**
+  - Un rollback **ne supprime pas** de révision : il en **ajoute** une nouvelle (4), copie de la
+    révision visée (1). Le chart actif redevient `guestbook-0.1.0`.
+  - La révision 5 vient d'un **second rollback lancé par erreur** (13:48:51, 10 s après le
+    premier). Il est sans effet : même contenu que la 4, donc Kubernetes ne change rien
+    (idempotence). Helm n'a pas de commande pour retirer une ligne de l'historique : c'est un
+    **journal**, on ne réécrit pas le passé. Ne pas supprimer le Secret
+    `sh.helm.release.v1.stack-prod.v5` à la main (casse l'historique).
+  - L'historique de cette release a été perdu ensuite (`helm uninstall` lors du test `keep`) : le
+    test complet montée de version → rollback → message conservé a été refait : captures 47-48.
+
+---
+
+## 44 et 45 — Passage du frontend de `dev` en ClusterIP (test par port-forward)
+
+**But :** simuler la phase de test du cloud (étape 8) : le site n'est **pas** exposé (Service
+interne `ClusterIP`), on y accède uniquement depuis son poste par un tunnel `kubectl port-forward`.
+La surcharge se fait par `--set` sur la ligne de commande, **sans** fichier de valeurs en plus.
+
+### 44 — `helm upgrade … --set frontend.service.type=ClusterIP` puis port-forward
+
+- **Fichier :** `44-helm-upgrade-dev-clusterip-port-forward.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Commandes :**
+  `helm upgrade stack-dev helm/guestbook -n dev -f helm/guestbook/values-dev.yaml --set frontend.service.type=ClusterIP`
+  puis `kubectl port-forward svc/stack-dev-guestbook-frontend 9090:8080 -n dev`
+- **Ce qu'on voit :**
+  - `REVISION: 2`, `Upgrade complete`, chart `guestbook-0.2.0` (version montée en partie 6).
+  - Les **NOTES changent toutes seules** avec le type de Service : « type ClusterIP », « Le
+    Service est interne : ouvrir un tunnel depuis le poste », commande `kubectl port-forward`
+    proposée (le `if` du `NOTES.txt`).
+  - Port-forward : `Forwarding from 127.0.0.1:9090 -> 80`, puis `Handling connection for 9090`
+    (le navigateur est passé par le tunnel).
+- **À retenir :** `9090:8080` = port **local** 9090 → port **du Service** 8080 (port de dev) ;
+  kubectl affiche `-> 80` car il va directement au port du **conteneur** (Apache écoute sur 80).
+  Le port local est libre : 9090 a été choisi ici, les NOTES proposent 8080.
+  **Priorité des valeurs :** `--set` > `-f values-dev.yaml` > `values.yaml`.
+
+### 45 — Le site de `dev` par le tunnel
+
+- **Fichier :** `45-site-dev-via-port-forward.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Action :** ouvrir `http://127.0.0.1:9090`.
+- **Ce qu'on voit :** le livre d'or de **dev** : « Voici la prod » (saisi par erreur dans l'onglet
+  de dev lors du test d'isolation) puis « Voici le dev » ×2.
+- **À retenir :** le site marche alors que le Service n'a **plus d'adresse externe** : seul le poste
+  qui a lancé le port-forward y accède. Retour en `LoadBalancer` : relancer `helm upgrade` **sans**
+  le `--set` (Helm repart des fichiers de valeurs).
+
+---
+
+## 46 — Bonus `keep` : le message de `prod` survit à `helm uninstall`
+
+- **Fichier :** `46-keep-prod-message-apres-reinstall.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Déroulé :**
+  1. 1ᵉʳ essai **raté** : `helm uninstall stack-prod -n prod` puis `kubectl get pvc -n prod` →
+     `No resources found` : le PVC (et les messages) ont été supprimés. Cause : `keep: true` était
+     dans `values-prod.yaml` mais **aucun template ne lisait la valeur**.
+  2. Correction dans `templates/redis-leader-pvc.yaml` : si `redisLeader.persistence.keep` vaut
+     `true`, annotation `helm.sh/resource-policy: keep` sur le PVC.
+  3. 2ᵉ essai : `helm upgrade` (pose l'annotation) → message « Je suis la prod » →
+     `helm uninstall stack-prod -n prod` → le PVC **reste** → `helm install stack-prod helm/guestbook
+     -n prod -f helm/guestbook/values-prod.yaml` (14:04:45).
+- **Ce qu'on voit :** `http://10.111.107.233` (nouvelle IP : le Service a été recréé) affiche
+  « Je suis la prod ».
+- **Vérifié sur le cluster :** le PVC `stack-prod-guestbook-redis-leader-data` a été créé à
+  13:53:37, **avant** la release (14:04:45), et porte `helm.sh/resource-policy: keep`.
+- **À retenir :** avec l'annotation, Helm **ne supprime pas** le PVC à l'uninstall. À la
+  réinstallation, le PVC portant le même nom est **réutilisé**. Sans l'annotation (dev), le PVC est
+  supprimé et, la StorageClass `standard` étant en `reclaimPolicy: Delete`, le disque aussi. Pour
+  vraiment effacer les données de prod : `kubectl delete pvc stack-prod-guestbook-redis-leader-data -n prod`.
+
+---
+
+## 47 et 48 — Montée de version puis rollback en `prod`, message conservé
+
+### 47 — Historique : 0.2.0 → 0.3.0 → rollback
+
+- **Fichier :** `47-helm-rollback-prod-0-3-0-history.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Commandes :** (`Chart.yaml` : `version: 0.3.0`, puis `helm upgrade stack-prod helm/guestbook -n
+  prod -f helm/guestbook/values-prod.yaml`, lancé **depuis `Project-2/`**) ;
+  `helm history stack-prod -n prod` ; `helm rollback stack-prod 1 -n prod` ; `helm history …`.
+- **Ce qu'on voit :** avant : 1 `Install complete` (0.2.0), 2 `Upgrade complete` (**0.3.0**,
+  `deployed`). Après : `Rollback was a success!` et une **révision 3** `Rollback to 1`
+  (**0.2.0**, `deployed`).
+- **Vérifié sur le cluster :** le PVC est toujours celui de 13:53:37, annotation `keep` présente :
+  ni l'upgrade ni le rollback ne l'ont recréé.
+- **Piège rencontré :** lancée depuis `Project/` au lieu de `Project-2/`, la commande échoue avec
+  `Error: repo helm not found` : le dossier `helm/guestbook` n'existant pas, Helm lit
+  `helm/guestbook` comme « chart `guestbook` du dépôt `helm` ».
+
+### 48 — Le message est toujours là après le rollback
+
+- **Fichier :** `48-helm-rollback-prod-message-conserve.png`
+- **Date :** 2026-11-04 · **Branche :** `feat/p2-environnements-helm`
+- **Action :** recharger `http://10.111.107.233` après le rollback.
+- **Ce qu'on voit :** « Je suis la prod ».
+- **À retenir (47 → 48) :** exigence H6 « montée de version en direct, puis retour à la révision
+  précédente ; les messages saisis restent visibles à chaque étape » ✅. Un rollback **ajoute**
+  une révision (copie de la révision visée) et ne touche pas au disque.
 

@@ -1,0 +1,11 @@
+# Surcharges de l'environnement DEV (release stack-dev, namespace dev).
+# Environnement de travail des développeurs : minimum de ressources, 1 réplica partout.
+commonLabels:
+  environment: dev
+  team: plateforme
+frontend:
+  service:
+    port: 8080            # port distinct par environnement (sous macOS / Windows, minikube tunnel publie tout sur 127.0.0.1)
+  resources:              # réduites : peu de trafic
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 200m, memory: 128Mi}
