@@ -444,8 +444,8 @@ messages réapparaissent. Seule l'adresse du site change (le Service a été rec
 - [x] Passage en ClusterIP par `--set` et accès par `kubectl port-forward`.
 - [x] `helm uninstall` : PVC supprimé en dev, **conservé et réutilisé** en prod (`keep`).
 
-➡️ **Suite :** Partie 7 — Le cluster GKE avec Terraform *(à venir)*.
+➡️ **Suite :** [Partie 7 — Le cluster GKE avec Terraform](07-cluster-gke-terraform.md).
 
 ---
 
-[⬅️ Partie 5 — Le chart Helm](05-chart-helm.md) · [🏠 Sommaire](README.md)
+[⬅️ Partie 5 — Le chart Helm](05-chart-helm.md) · [🏠 Sommaire](README.md) · [Partie 7 — Le cluster GKE ➡️](07-cluster-gke-terraform.md)
