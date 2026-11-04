@@ -155,8 +155,7 @@ GKE · Terraform · Helm — passation à l'équipe d'exploitation
 3. Kubernetes et persistance
 4. Helm : un chart, 3 environnements
 5. Terraform et le cloud
-6. Exploitation, décisions, limites
-7. Démonstration
+6. Conclusion
 
 ---
 
@@ -290,7 +289,7 @@ Terraform crée le cluster, Helm installe l'application
 <!-- _class: part -->
 <!-- _paginate: false -->
 
-# <em>03</em> La persistance
+# <em>03</em> Kubernetes et persistance
 
 Les messages survivent au redémarrage de Redis
 
@@ -398,3 +397,337 @@ Même commande qu'au début : on supprime le pod Redis, Kubernetes en recrée un
 
 ![h:380](../docs/screenshots/21-messages-conserves-apres-suppression.png)
 
+
+---
+
+<!-- _class: part -->
+<!-- _paginate: false -->
+
+# <em>04</em> Helm : un chart, 3 environnements
+
+Les mêmes fichiers partout, seules les valeurs changent
+
+---
+
+## Le chart : les fichiers
+
+```
+helm/guestbook/
+├── Chart.yaml            # carte d'identité du chart
+├── values.yaml           # valeurs par défaut
+├── values-dev.yaml       # ce qui change en dev
+├── values-staging.yaml   # ce qui change en staging
+├── values-prod.yaml      # ce qui change en prod
+└── templates/
+    ├── _helpers.tpl      # noms et labels, écrits une seule fois
+    ├── *-deployment.yaml, *-service.yaml, *-configmap.yaml
+    ├── redis-leader-pvc.yaml
+    └── NOTES.txt         # message affiché après l'installation
+```
+
+- Les **templates** = nos manifestes `k8s/` avec des **trous** `{{ }}`
+- Les **values** remplissent ces trous
+
+---
+
+## `Chart.yaml` : la carte d'identité
+
+```yaml
+apiVersion: v2
+name: guestbook
+type: application
+version: 0.3.0      # version du CHART : +1 à chaque modification
+appVersion: "v5"    # version de l'APPLICATION (tag de l'image frontend)
+```
+
+| Champ | Utilité |
+|---|---|
+| `version` | Savoir quel chart tourne (`helm history`) |
+| `appVersion` | Image utilisée si aucun `tag` n'est donné |
+
+---
+
+## `values.yaml` : les valeurs par défaut
+
+```yaml
+commonLabels:
+  environment: local          # remplacé par dev / staging / prod
+frontend:
+  replicaCount: 1
+  image: { repository: …/gb-frontend, tag: "" }   # "" = appVersion
+  service: { type: LoadBalancer, port: 80 }
+  resources: { requests: {cpu: 100m, memory: 128Mi}, … }
+redisLeader:
+  replicaCount: 1             # 0 ou 1 : un seul leader
+  image: { repository: docker.io/redis, tag: "6.0.5" }
+  persistence:
+    size: 1Gi
+    storageClass: ""          # "" = classe par défaut du cluster
+    keep: false               # true = le disque survit à helm uninstall
+redisFollower:
+  replicaCount: 1
+```
+
+- **Une seule source** : toutes les clés y sont, commentées
+
+---
+
+## `values-<ENV>.yaml` : seulement ce qui change
+
+| Valeur | dev | staging | prod |
+|---|---|---|---|
+| `frontend.service.port` | 8080 | 8081 | 80 |
+| `frontend.replicaCount` | 1 | **2** | **3** |
+| `redisFollower.replicaCount` | 1 | 1 | **2** |
+| `frontend.resources` | réduites | défaut | **augmentées** |
+| `persistence.size` | 1Gi | 1Gi | **5Gi** |
+| `persistence.keep` | false | false | **true** |
+| `commonLabels.environment` | dev | staging | prod |
+
+- dev : minimum · staging : proche de prod · prod : redondance et disque protégé
+
+---
+
+## `templates/` : les trous remplis par les values
+
+```yaml
+# templates/redis-leader-pvc.yaml (extrait)
+metadata:
+  name: {{ include "guestbook.redisLeader.pvcName" . }}
+  {{- if .Values.redisLeader.persistence.keep }}
+  annotations:
+    helm.sh/resource-policy: keep
+  {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.redisLeader.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.redisLeader.persistence.size }}
+```
+
+- `{{ .Values.… }}` : lit une valeur · `{{ if }}` : ajoute un bloc ou non
+- prod → `5Gi` + `keep` · dev → `1Gi` sans `keep`
+
+---
+
+## `_helpers.tpl` : un nom unique par objet
+
+Le nom est calculé : **`<release>` + `guestbook` + `<composant>`**
+
+```yaml
+# Dans le template, on n'écrit pas le nom en dur, on appelle le helper :
+name: {{ include "guestbook.componentName" (dict "ctx" . "component" "frontend") }}
+
+# Résultat avec la release stack-dev :
+name: stack-dev-guestbook-frontend
+```
+
+| Release | Nom du frontend |
+|---|---|
+| `stack-dev` | `stack-dev-guestbook-frontend` |
+| `stack-prod` | `stack-prod-guestbook-frontend` |
+
+- Écrit **une seule fois**, appelé par tous les templates (idem pour les **labels**)
+
+---
+
+## Tout assembler : une commande par environnement
+
+```bash
+helm install stack-prod helm/guestbook -n prod --create-namespace \
+  -f helm/guestbook/values-prod.yaml
+```
+
+| Morceau | Rôle |
+|---|---|
+| `stack-prod` | Nom de la release → nom des objets |
+| `helm/guestbook` | Le chart (les templates) |
+| `-n prod` | Le namespace : isolement |
+| `-f values-prod.yaml` | Les valeurs de l'environnement |
+
+Priorité : **`--set`** > **`-f values-<ENV>.yaml`** > **`values.yaml`**
+
+---
+
+<!-- _class: part -->
+<!-- _paginate: false -->
+
+# <em>05</em> Terraform et le cloud
+
+Le cluster GKE créé en code, l'application déployée par le même chart
+
+---
+
+## Les fichiers Terraform
+
+```
+terraform/
+├── versions.tf                 # versions de Terraform et des providers
+├── providers.tf                # connexion à Google Cloud : projet + région
+├── variables.tf                # toutes les variables
+├── main.tf                     # le cluster (module officiel GKE)
+├── outputs.tf                  # les infos utiles après la création
+├── terraform.tfvars.example    # modèle à copier (versionné)
+└── .terraform.lock.hcl         # versions exactes installées (versionné)
+```
+
+- **Terraform** crée le cluster · **Helm** installe l'application
+- `terraform.tfvars` et l'état (`tfstate`) restent **hors de Git**
+
+---
+
+## `main.tf` : le cluster
+
+```hcl
+module "gke" {
+  source  = "terraform-google-modules/kubernetes-engine/google//modules/beta-autopilot-public-cluster"
+  version = "~> 46.0"                       # toute 46.x, jamais 47
+
+  project_id          = var.project_id
+  name                = var.cluster_name    # autopilot-cluster-1
+  region              = var.region          # Autopilot = régional
+  network             = var.network         # "default" du lab
+  subnetwork          = var.subnetwork
+  release_channel     = var.release_channel # REGULAR
+  deletion_protection = var.deletion_protection   # false → destroy possible
+}
+```
+
+- **Module officiel** de Google : pas de cluster écrit à la main
+- Que des `var.…` : **aucune valeur en dur**
+
+---
+
+## Les variables : déclarées, remplies, utilisées
+
+```hcl
+# ① variables.tf : on DÉCLARE la variable
+variable "project_id" { type = string }   # pas de valeur par défaut
+
+# ② terraform.tfvars : on donne la VALEUR (fichier hors de Git)
+project_id = "qwiklabs-gcp-…"
+region     = "us-east1"
+
+# ③ main.tf : on l'UTILISE
+project_id = var.project_id
+```
+
+- **2 valeurs à remplir** à chaque lab : `project_id` et `region`
+- Les autres ont une **valeur par défaut** : `autopilot-cluster-1`, réseau `default`…
+
+---
+
+## Les versions et la connexion
+
+| Fichier | Question | Réponse |
+|---|---|---|
+| `versions.tf` | Quelles versions sont permises ? | `google ~> 8.0` : toute 8.x, jamais 9 |
+| `.terraform.lock.hcl` | Quelle version exacte ? | `8.10.0` pour toute l'équipe |
+| `providers.tf` | Où créer le cluster ? | Projet + région du lab |
+
+- Même version pour tous → **même résultat** sur chaque poste
+- Connexion à Google : le compte `gcloud` du lab
+
+---
+
+## `outputs.tf` : ce qu'on récupère
+
+![w:1100](../docs/screenshots/58-terraform-output.png)
+
+- Lus **dans le module** : ils montrent ce qui a vraiment été créé
+- `cluster_endpoint` est **sensible** : masqué
+- `get_credentials_command` : la commande pour brancher `kubectl`
+
+---
+
+<!-- _class: flow -->
+
+## Le cycle Terraform
+
+1. **`init`** télécharge le module et les providers
+2. **`plan`** montre ce qui va être créé
+3. **`apply`** crée le cluster (~10 min)
+4. **`plan`** à nouveau : `No changes` → idempotent
+
+---
+
+## Preuve : le cluster est créé
+
+![w:1150](../docs/screenshots/56-terraform-apply-outputs.png)
+
+`Apply complete!` et les outputs du cluster `autopilot-cluster-1`
+
+---
+
+## Preuve : relancer ne change rien
+
+![w:1150](../docs/screenshots/57-terraform-plan-no-changes.png)
+
+`No changes` : le code et le cluster sont identiques
+V
+---
+
+## Déployer sur GKE : le même chart
+
+```bash
+eval "$(terraform output -raw get_credentials_command)"   # kubectl → GKE
+
+# dev : d'abord en privé (ClusterIP), test avec port-forward
+helm install stack-dev helm/guestbook -n dev --create-namespace \
+  -f helm/guestbook/values-dev.yaml --set frontend.service.type=ClusterIP
+kubectl port-forward svc/stack-dev-guestbook-frontend 8080:8080 -n dev
+
+# puis ouverture (LoadBalancer) + staging et prod
+helm upgrade stack-dev helm/guestbook -n dev -f helm/guestbook/values-dev.yaml
+```
+
+- **Aucune modification** du chart entre minikube et GKE
+- Le disque : `standard-rwo` (disque persistant Google), choisi automatiquement
+
+---
+
+## Preuve : 3 environnements, 3 IP publiques
+
+![w:1150](../docs/screenshots/68-gke-svc-loadbalancer-trois-ip.png)
+
+Chaque environnement a son **LoadBalancer Google** et son port : 8080 · 8081 · 80
+
+---
+
+## Preuve : les disques persistants Google
+
+![w:1150](../docs/screenshots/69-gke-persistance-prod-pvc-pv-disques.png)
+
+PVC `Bound` → PV `standard-rwo` → **vrai disque** dans Google Cloud
+
+---
+
+<!-- _class: part -->
+<!-- _paginate: false -->
+
+# <em>06</em> Conclusion
+
+---
+
+## Ce qu'on a livré
+
+| # | Objectif | Résultat |
+|---|---|---|
+| 1 | **Ne perdre aucun message** | ✅ Disque persistant + journal AOF |
+| 2 | **Héberger dans le cloud** | ✅ GKE Autopilot, 3 IP publiques |
+| 3 | **Créer le cluster en code** | ✅ Terraform, module officiel |
+| 4 | **3 environnements isolés** | ✅ Un chart Helm, 3 releases |
+| 5 | **Travailler en local** | ✅ minikube, même chart |
+
+- Tout est documenté pour l'équipe : `README.md` + `docs/`
+
+---
+
+<!-- _class: lead -->
+<!-- _paginate: false -->
+<!-- _footer: "" -->
+
+# Merci
+
+Des questions ?
