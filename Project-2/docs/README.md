@@ -16,7 +16,7 @@ La documentation est découpée **en un fichier par partie**. Lire dans l'ordre 
 | 4 | [La persistance des données](04-persistance-des-donnees.md) | Ne plus perdre de messages | ✅ |
 | 5 | [Le chart Helm](05-chart-helm.md) | Un seul chart pour tous les environnements | ✅ |
 | 6 | [Les environnements dev / staging / prod](06-environnements-dev-staging-prod.md) | Installation, mise à jour, retour arrière | ✅ |
-| 7 | Le cluster GKE avec Terraform | Création du cluster dans Google Cloud | ⏳ à venir |
+| 7 | [Le cluster GKE avec Terraform](07-cluster-gke-terraform.md) | Création du cluster dans Google Cloud | ✅ |
 | 8 | Le déploiement dans le cloud | Connexion au cluster et mise en ligne | ⏳ à venir |
 | 9 | Exploitation | Runbooks, dépannage, limites connues | ⏳ à venir |
 
