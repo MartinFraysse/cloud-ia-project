@@ -1,0 +1,23 @@
+# =============================================================================
+# terraform.tfvars.example — MODÈLE des valeurs d'entrée. Ne contient aucune valeur réelle.
+#
+#   cp terraform.tfvars.example terraform.tfvars    # terraform.tfvars est ignoré par Git
+#
+# Renseigner les valeurs de la session de lab en cours (elles changent à chaque session).
+# Description de chaque variable : variables.tf et README.md (section Terraform).
+# =============================================================================
+
+# --- Obligatoires : propres à la session de lab ---
+project_id = "qwiklabs-gcp-00-0123456789ab" # panneau du lab, ou : gcloud config get-value project
+region     = "us-central1"                  # région autorisée par le lab
+zone       = "us-central1-f"                # zone autorisée par le lab, dans la région ci-dessus
+vm_count   = 2                              # 2 à 10 ; 3 pour ajouter une VM : rien d'autre à modifier
+
+# IP publique IPv4 du poste de l'opérateur en /32 (curl -4 -s https://ifconfig.me). Jamais 0.0.0.0/0.
+ssh_source_ranges = ["203.0.113.10/32"]
+
+# --- Optionnelles : valeurs par défaut adaptées au lab ---
+# machine_type        = "e2-small"
+# name_prefix         = "fleetinfo"
+# subnet_cidr         = "10.10.0.0/24"
+# ssh_public_key_path = "../local/ssh/fleet_key.pub"
