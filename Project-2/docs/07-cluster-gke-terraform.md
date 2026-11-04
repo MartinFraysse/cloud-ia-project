@@ -2,8 +2,8 @@
 
 ## Objectif
 
-Créer le cluster Kubernetes de Google (**GKE Autopilot**) **avec du code**, pour pouvoir le
-recréer à l'identique à chaque session de lab, en quelques commandes.
+Créer le cluster **GKE Autopilot** avec Terraform, pour le recréer à l'identique à chaque
+session de lab.
 
 | Outil | Crée | Ne crée pas |
 |---|---|---|
@@ -24,7 +24,7 @@ flowchart LR
     MOD(("📦 Module Google<br/>beta-autopilot-public-cluster"))
     GKE["☸️ <b>autopilot-cluster-1</b><br/>GKE Autopilot"]
     OUT["📄 <b>outputs.tf</b><br/>nom, région, connexion…"]
-    ST[("🗂️ terraform.tfstate<br/>le carnet de Terraform")]
+    ST[("🗂️ terraform.tfstate")]
 
     TFV -.->|"①"| VAR
     VAR -.->|"② var.…"| MAIN
@@ -43,10 +43,8 @@ flowchart LR
     class ST tool
 ```
 
-- Le **module** officiel de Google contient le code qui crée le cluster ; `main.tf` lui donne
-  les valeurs.
-- Le **state** (`terraform.tfstate`) liste ce que Terraform a créé ; il sert à `plan` et à
-  `destroy`.
+- `main.tf` passe les valeurs au **module** officiel de Google, qui crée le cluster.
+- Le **state** (`terraform.tfstate`) liste ce que Terraform a créé.
 
 ---
 
@@ -78,8 +76,8 @@ terraform/
 | `release_channel` | `var.release_channel` | `REGULAR` |
 | `deletion_protection` | `var.deletion_protection` | `false`, sinon `terraform destroy` échoue |
 
-`source` et `version` sont les **seules valeurs écrites en dur** : Terraform interdit de les
-mettre en variables. Tous les autres arguments passent par une variable.
+`source` et `version` sont les **seules valeurs en dur** (Terraform interdit les variables ici).
+Tous les autres arguments passent par une variable.
 
 ### `variables.tf` — les entrées
 
@@ -109,7 +107,7 @@ mettre en variables. Tous les autres arguments passent par une variable.
 - `providers.tf` donne le projet et la région. **Aucun identifiant dans le code** : la connexion
   vient de `gcloud` (étape 7.4).
 - **`.terraform.lock.hcl` est versionné** : il fige les versions exactes (8.10.0…) et leurs
-  empreintes, pour que toute l'équipe et le repreneur utilisent les **mêmes** providers.
+  empreintes.
 
 ### `outputs.tf` — les sorties
 
@@ -128,7 +126,7 @@ Les valeurs sont lues dans le **module**, pas recopiées des variables.
 ### `terraform.tfvars.example` — le modèle
 
 `terraform.tfvars` contient l'ID du projet : il n'est **pas versionné** (`.gitignore` :
-`*.tfvars`). Le modèle `.example`, lui, est versionné et indique où trouver chaque valeur.
+`*.tfvars`). Le modèle `.example` est versionné et indique où trouver chaque valeur.
 
 ---
 
@@ -155,8 +153,8 @@ continue**. Sans cela, aucune API ne peut être activée (erreur `UREQ_TOS_NOT_A
 
 ### 2. Connecter `gcloud` et Terraform
 
-Avec le compte du lab : `gcloud auth login` sert à `gcloud` et `kubectl`,
-`gcloud auth application-default login` sert à **Terraform**.
+`gcloud auth login` sert à `gcloud` et `kubectl`. `gcloud auth application-default login` sert
+à **Terraform**.
 
 ```bash
 gcloud auth login
@@ -178,8 +176,8 @@ gcloud projects get-iam-policy <PROJECT_ID> \
 
 ![rôles du compte du lab](screenshots/53-gcloud-roles-compte-lab.png)
 
-**`roles/owner` doit apparaître.** Le module crée un compte de service et lui donne des droits
-IAM sur le projet : un simple `roles/editor` ne peut pas modifier les droits IAM.
+**`roles/owner` doit apparaître.** Le module donne des droits IAM à un compte de service :
+`roles/editor` ne suffit pas.
 
 ### 4. Activer l'API GKE
 
@@ -222,8 +220,7 @@ terraform apply        # taper "yes"
 
 ![terraform apply et outputs](screenshots/56-terraform-apply-outputs.png)
 
-`Apply complete! Resources: 7 added, 0 changed, 0 destroyed.` en quelques minutes, puis les
-outputs.
+`Apply complete! Resources: 7 added, 0 changed, 0 destroyed.` en quelques minutes.
 
 ### Idempotence
 
@@ -233,7 +230,7 @@ terraform plan
 
 ![terraform plan : No changes](screenshots/57-terraform-plan-no-changes.png)
 
-**`No changes. Your infrastructure matches the configuration.`** : pas de dérive persistante.
+**`No changes. Your infrastructure matches the configuration.`**
 
 ### Relire les sorties
 
@@ -244,7 +241,7 @@ terraform output -raw cluster_endpoint     # valeur sensible, lue volontairement
 
 ![terraform output](screenshots/58-terraform-output.png)
 
-L'endpoint (adresse de l'API Kubernetes) est masqué ; `-raw` l'affiche.
+L'endpoint est masqué ; `-raw` l'affiche.
 
 ### Ce que Terraform a réellement créé
 

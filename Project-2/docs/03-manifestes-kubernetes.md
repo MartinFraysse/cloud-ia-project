@@ -2,19 +2,18 @@
 
 ## Objectif
 
-Réécrire les fichiers du tutoriel **proprement**, pour corriger les défauts relevés en
+Réécrire les fichiers du tutoriel pour corriger les défauts relevés en
 [partie 2](02-constater-le-probleme.md) :
 
 - étiquettes standard ;
-- réglages rangés dans des **ConfigMaps** ;
+- réglages dans des **ConfigMaps** ;
 - **contrôles de santé** sur chaque programme ;
 - **limites de ressources**.
 
 On les teste sur le cluster local (minikube), dans le namespace `dev`.
 
-> La **persistance** des messages (disque pour Redis) n'est **pas** traitée ici : c'est la
-> partie 4. À la fin de cette partie, l'application fonctionne mais perd encore ses
-> messages au redémarrage.
+> La **persistance** (disque pour Redis) est traitée en partie 4. À la fin de cette partie,
+> l'application perd encore ses messages au redémarrage.
 
 ---
 
@@ -76,12 +75,8 @@ flowchart TB
     class U user
 ```
 
-| Couleur | Objet | Rôle |
-|---|---|---|
-| 🟩 vert | **Service** | Adresse fixe devant les pods |
-| 🟦 bleu | **Deployment** | Garde les pods allumés |
-| 🟨 jaune | **ConfigMap** | Réglages (flèche pointillée = « donne ses réglages à ») |
-| — | **Namespace** | L'espace isolé qui contient **tout le schéma**. Il y en a un par environnement (`dev`, `staging`, `prod`), avec le même contenu. |
+Le même contenu est créé dans chaque namespace (`dev`, `staging`, `prod`). La flèche pointillée
+signifie « fournit ses réglages à ».
 
 ---
 
@@ -89,7 +84,7 @@ flowchart TB
 
 ### Les étiquettes (labels)
 
-Chaque objet porte 4 étiquettes standard recommandées par Kubernetes :
+Chaque objet porte 4 étiquettes standard :
 
 | Étiquette | Valeur | Sens |
 |---|---|---|
@@ -103,8 +98,8 @@ Les **sélecteurs** (Deployment → pods, Service → pods) utilisent `name`, `i
 
 ```mermaid
 flowchart LR
-    D["📦 <b>Deployment</b><br/>« mes pods ont<br/>component=frontend »"] ==>|"crée et surveille"| P(("pods<br/>component=frontend"))
-    S["🔀 <b>Service</b><br/>« j'envoie le trafic aux pods<br/>component=frontend »"] ==>|"envoie le trafic"| P
+    D["📦 <b>Deployment</b><br/>component=frontend"] ==>|"crée et surveille"| P(("pods<br/>component=frontend"))
+    S["🔀 <b>Service</b><br/>component=frontend"] ==>|"envoie le trafic"| P
 
     classDef svc fill:#0e7490,stroke:#67e8f9,color:#fff
     classDef dep fill:#1d4ed8,stroke:#93c5fd,color:#fff
@@ -123,29 +118,26 @@ Le code du site (PHP) lit le réglage `GET_HOSTS_FROM` :
 
 - avec `dns` (tutoriel), les noms `redis-leader` et `redis-follower` sont **écrits en dur**
   dans le programme ;
-- avec `env` (**notre choix**), il lit deux variables : `REDIS_LEADER_SERVICE_HOST` et
+- avec `env` (**notre choix**), il lit `REDIS_LEADER_SERVICE_HOST` et
   `REDIS_FOLLOWER_SERVICE_HOST`.
 
-On fournit ces variables **nous-mêmes** dans les ConfigMaps :
+On fournit ces variables dans les ConfigMaps :
 
 | ConfigMap | Réglages | Utilisée par |
 |---|---|---|
 | `frontend-config` | `GET_HOSTS_FROM=env`, `REDIS_LEADER_SERVICE_HOST=redis-leader`, `REDIS_FOLLOWER_SERVICE_HOST=redis-follower` | Le site : où **écrire**, où **lire** |
 | `redis-follower-config` | `GET_HOSTS_FROM=env`, `REDIS_LEADER_SERVICE_HOST=redis-leader` | Les copies : **qui copier** |
 
-**Pourquoi ce choix ?** Les noms des Services ne sont plus figés dans le programme. On pourra les
-changer avec Helm (partie 5), en modifiant une seule valeur.
+**Pourquoi :** les noms des Services ne sont plus figés dans le programme. Avec Helm
+(partie 5), on les change en modifiant une seule valeur.
 
 > ⚠️ Le **port 6379** reste écrit en dur dans le programme : les Services Redis doivent garder
 > ce port.
 
 ### Les contrôles de santé (probes)
 
-Chaque programme a deux contrôles :
-
 | | readinessProbe | livenessProbe |
 |---|---|---|
-| Question | « Es-tu **prêt** ? » | « Es-tu **vivant** ? » |
 | Si échec | Plus de trafic envoyé au pod | Le pod est redémarré |
 | 1er test | après 5 s | après 15 s |
 | Fréquence | toutes les 10 s | toutes les 20 s |
@@ -155,9 +147,8 @@ Chaque programme a deux contrôles :
 | frontend | Demande de la page `/` (`httpGet` sur le port `http`) | Vérifie que le site répond |
 | redis-leader / redis-follower | `redis-cli ping \| grep -q PONG` (`exec`) | Vérifie que Redis **répond vraiment**, pas seulement que le port est ouvert |
 
-On garde les valeurs par défaut de Kubernetes pour le reste : 1 s pour répondre, 3 échecs avant
-d'agir. La liveness est **plus patiente** que la readiness : redémarrer coûte plus cher que
-retirer du trafic.
+Le reste garde les valeurs par défaut (1 s pour répondre, 3 échecs avant d'agir). La liveness
+est **plus patiente** que la readiness : redémarrer coûte plus cher que retirer du trafic.
 
 ### Les ressources
 
@@ -167,7 +158,7 @@ retirer du trafic.
 | `limits` | 250m (0,25 processeur) | 256 Mi | **Plafond** : au-delà, CPU ralenti et pod arrêté s'il dépasse la mémoire |
 
 Les `requests` reprennent les valeurs du tutoriel (mémoire légèrement augmentée). Les `limits`
-laissent une marge d'environ ×2,5 pour absorber les pics.
+laissent une marge d'environ ×2,5 pour les pics.
 
 ### Les Services
 
@@ -177,7 +168,7 @@ laissent une marge d'environ ×2,5 pour absorber les pics.
 | `redis-leader` | `ClusterIP` | 6379 → `redis` | L'intérieur du cluster uniquement |
 | `redis-follower` | `ClusterIP` | 6379 → `redis` | L'intérieur du cluster uniquement |
 
-Une base de données n'est **jamais** exposée hors du cluster.
+La base de données n'est pas exposée hors du cluster.
 
 ### Avant / après
 
@@ -195,21 +186,18 @@ Une base de données n'est **jamais** exposée hors du cluster.
 
 ## Étape 3.3 — Installer dans `dev`
 
+Depuis le dossier `Project-2/` :
+
 ```bash
 kubectl config current-context           # doit afficher : minikube
 kubectl apply -f k8s/namespaces.yaml     # crée dev, staging, prod
 kubectl apply -n dev -f k8s/             # installe l'application dans dev
 ```
 
-> Les commandes sont lancées depuis le dossier `Project-2/`.
-
 ![Installation dans dev](screenshots/12-apply-manifestes-dev.png)
 
-**À savoir :**
-
-- `unchanged` : l'objet existe déjà et n'a pas changé, `kubectl apply` ne fait rien.
-- Aucun fichier ne contient de namespace : on le choisit à l'installation avec `-n dev`. Les
-  mêmes fichiers servent donc pour `staging` et `prod`.
+- Aucun fichier ne fixe de namespace : on le choisit avec `-n dev`. Les mêmes fichiers servent
+  pour `staging` et `prod`.
 - Le sous-dossier `tutoriel-origine/` n'est pas lu (`-f` sur un dossier n'est pas récursif).
 
 ---
@@ -230,8 +218,7 @@ kubectl get all,cm -n dev
 | `READY 1/1` | La readiness probe est validée |
 | ConfigMaps | `frontend-config` (3 réglages) et `redis-follower-config` (2 réglages) |
 
-> `kube-root-ca.crt` est une ConfigMap créée automatiquement par Kubernetes dans chaque
-> namespace. Ce n'est pas la nôtre.
+> `kube-root-ca.crt` est créée automatiquement par Kubernetes. Ce n'est pas la nôtre.
 
 ### Chaque Service trouve ses pods
 
@@ -241,8 +228,7 @@ kubectl get endpoints -n dev
 
 ![Endpoints dans dev](screenshots/14-endpoints-dev.png)
 
-Chaque Service doit lister des adresses de pods. Une ligne `<none>` signifierait que le
-sélecteur ne correspond à aucune étiquette.
+Une ligne `<none>` signifierait que le sélecteur ne correspond à aucun pod.
 
 | Service | Nombre d'adresses | Correspond à |
 |---|---|---|
@@ -278,8 +264,8 @@ Ouvrir `http://<EXTERNAL-IP>` et écrire des messages :
 
 ![L'application fonctionne dans dev](screenshots/15-application-dev-fonctionnelle.png)
 
-Les messages s'enregistrent et s'affichent : le site écrit bien sur `redis-leader` et lit bien
-sur `redis-follower`, grâce aux ConfigMaps.
+Les messages s'enregistrent et s'affichent : le site écrit sur `redis-leader` et lit sur
+`redis-follower` grâce aux ConfigMaps.
 
 ---
 

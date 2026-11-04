@@ -2,19 +2,17 @@
 
 ## Objectif
 
-Corriger le problème constaté en [partie 2](02-constater-le-probleme.md) : **plus aucun message
-ne doit être perdu** quand la base principale (`redis-leader`) redémarre.
+Corriger le problème constaté en [partie 2](02-constater-le-probleme.md) : **aucun message ne doit
+être perdu** quand `redis-leader` redémarre. C'est l'exigence n°1 du client.
 
-C'est **l'exigence n°1 du client**.
-
-Il faut **deux choses en même temps**, l'une ne sert à rien sans l'autre :
+Il faut deux pièces. L'une ne sert à rien sans l'autre :
 
 | Pièce | Rôle | Sans elle… |
 |---|---|---|
 | ① **Un disque persistant** (PVC) monté sur `/data` | Garder les fichiers même si le pod meurt | Redis écrit dans le conteneur, qui disparaît avec le pod |
 | ② **Un réglage Redis** (`redis.conf`) | Dire à Redis d'écrire chaque message sur ce disque | Redis a un disque mais garde tout en mémoire |
 
-Et un troisième réglage pour protéger le disque : la stratégie **`Recreate`**.
+La stratégie **`Recreate`** protège ensuite le disque.
 
 ---
 
@@ -49,16 +47,9 @@ flowchart LR
     class SC tool
 ```
 
-### Le disque : PVC, StorageClass, PV
+### Le disque
 
-| Objet | Rôle |
-|---|---|
-| **PVC** (*PersistentVolumeClaim*) | La **demande** de disque : « 1 Go, branchable sur un seul nœud » |
-| **StorageClass** | Le **type de stockage** qui crée le disque automatiquement |
-| **PV** (*PersistentVolume*) | Le **disque réellement créé** |
-
-Le PVC est un objet **indépendant du pod** : si le pod est supprimé, le PVC et son disque
-restent. Le nouveau pod rebranche le même disque.
+Le PVC survit au pod. Le nouveau pod rebranche le même disque.
 
 | Cluster | StorageClass par défaut | Disque créé |
 |---|---|---|
@@ -67,8 +58,8 @@ restent. Le nouveau pod rebranche le même disque.
 
 ### Le réglage Redis : le mode AOF
 
-AOF (*Append Only File*) = un **journal** : Redis ajoute **chaque écriture** à la fin du fichier
-`/data/appendonly.aof`. Au redémarrage, il **relit le journal** et retrouve tous les messages.
+Redis ajoute chaque écriture au journal `/data/appendonly.aof`. Au redémarrage, il relit ce
+journal.
 
 | Mode | Principe | Perte maximale | Utilisé |
 |---|---|---|---|
@@ -79,7 +70,7 @@ AOF (*Append Only File*) = un **journal** : Redis ajoute **chaque écriture** à
 
 ## Étape 4.2 — Les fichiers
 
-Deux fichiers ajoutés, un modifié, dans `Project-2/k8s/` :
+Dans `Project-2/k8s/` :
 
 ```
 Project-2/k8s/
@@ -141,14 +132,11 @@ spec:
 | ③ `volumeMounts` | Le disque apparaît sur `/data`, le réglage sur `/etc/redis` (lecture seule) |
 | ④ `volumes` | `data` vient du PVC, `config` vient de la ConfigMap |
 
-`volumes` et `volumeMounts` sont reliés par leur **nom** (`data`, `config`).
-
 ---
 
 ## Étape 4.3 — Pourquoi la stratégie `Recreate`
 
-Le disque est en mode **`ReadWriteOnce`** : il ne peut être branché qu'à **un seul nœud** à la
-fois.
+Le disque est en **`ReadWriteOnce`** : un seul nœud à la fois.
 
 ```mermaid
 flowchart LR
@@ -178,10 +166,8 @@ flowchart LR
 | Pods sur le même nœud | **Deux Redis écrivent dans les mêmes fichiers** → base corrompue | Un seul Redis à la fois |
 | Disponibilité | Pas de coupure | Quelques secondes sans écriture possible |
 
-**Compromis assumé :** quelques secondes sans écriture valent mieux qu'une base corrompue.
-
-Le frontend et les copies (`redis-follower`) restent en `RollingUpdate` : ils n'ont pas de
-disque.
+Compromis assumé : quelques secondes sans écriture plutôt qu'une base corrompue. Le frontend et
+`redis-follower` restent en `RollingUpdate` : ils n'ont pas de disque.
 
 ---
 
@@ -203,18 +189,17 @@ kubectl rollout status deploy/redis-leader -n dev
 | Le reste | `unchanged` : le site et les copies ne sont pas touchés |
 | PVC | `Bound`, `1Gi`, `RWO`, StorageClass `standard` |
 
-> `STORAGECLASS = standard` alors qu'on n'a **pas** écrit de `storageClassName` : c'est la
-> preuve que la classe **par défaut** est utilisée.
+`STORAGECLASS = standard` sans `storageClassName` dans le PVC : la classe par défaut est utilisée.
 
 ---
 
 ## Étape 4.5 — Le test de non-perte
 
-C'est le test imposé par le client. On refait **exactement** la manipulation de la partie 2.
+Test imposé par le client. Même manipulation qu'en partie 2.
 
 ### Préparer
 
-Dans un terminal dédié, laissé ouvert pendant tout le test :
+Dans un terminal laissé ouvert :
 
 ```bash
 minikube tunnel
@@ -238,9 +223,8 @@ kubectl exec -n dev deploy/redis-leader -- redis-cli GET guestbook
 
 ![Messages dans Redis avant suppression](screenshots/18-redis-get-avant-suppression.png)
 
-Tous les messages sont dans **une seule clé** Redis, `guestbook`, séparés par des virgules. La
-virgule au début est normale : l'application ajoute `,message` à la fin d'une valeur vide au
-départ.
+Les messages sont dans une seule clé, `guestbook`, séparés par des virgules. La virgule de tête
+est normale.
 
 ### 2. Vérifier que Redis écrit sur le disque
 
@@ -254,10 +238,10 @@ kubectl exec -n dev deploy/redis-leader -- ls -l /data
 
 | Résultat | Signification |
 |---|---|
-| `dir` → `/data` | Redis écrit sur le disque persistant : `redis.conf` est bien utilisé |
+| `dir` → `/data` | `redis.conf` est utilisé : Redis écrit sur le disque persistant |
 | `appendonly` → `yes` | Le journal AOF est actif |
-| `appendonly.aof` | Le journal, qui contient les messages |
-| `dump.rdb` | Une copie complète créée par le leader pour **synchroniser les copies** (`redis-follower`) |
+| `appendonly.aof` | Le journal des messages |
+| `dump.rdb` | Copie créée par le leader pour synchroniser `redis-follower` |
 
 ### 3. Supprimer le pod leader
 
@@ -268,8 +252,7 @@ kubectl get pods -n dev -w               # Ctrl+C quand le nouveau pod est 1/1
 
 ![Suppression du pod leader](screenshots/20-suppression-pod-leader-persistance.png)
 
-Le Deployment recrée un **nouveau** pod (nom différent), prêt en ~12 s. Il rebranche le **même**
-PVC sur `/data`.
+Un nouveau pod est prêt en ~12 s. Il rebranche le même PVC sur `/data`.
 
 ### 4. Recharger la page
 
@@ -281,8 +264,7 @@ kubectl exec -n dev deploy/redis-leader -- redis-cli GET guestbook
 
 ![Messages dans Redis après suppression](screenshots/22-redis-get-apres-suppression.png)
 
-✅ **Les 3 messages sont toujours là.** Au démarrage, le nouveau Redis a relu le journal
-`appendonly.aof` sur le disque.
+✅ **Les 3 messages sont toujours là.** Le nouveau Redis a relu `appendonly.aof`.
 
 ### Avant / après
 
@@ -316,9 +298,8 @@ kubectl rollout restart deploy/redis-leader -n dev
 | ② | `9965b5457-qn5fc` `Pending` puis `ContainerCreating` | Le nouveau pod n'apparaît **qu'ensuite** |
 | ③ | `9965b5457-qn5fc` `1/1 Running` | Le nouveau Redis est prêt, après 12 s |
 
-En `RollingUpdate`, le nouveau pod serait apparu **avant** l'arrêt de l'ancien. Les lignes
-`Completed` de l'ancien pod plus bas correspondent à la suppression de l'objet : son conteneur
-était déjà arrêté.
+Les lignes `Completed` suivantes de l'ancien pod correspondent à la suppression de l'objet. Son
+conteneur était déjà arrêté.
 
 ```bash
 kubectl exec -n dev deploy/redis-leader -- redis-cli GET guestbook
@@ -347,10 +328,10 @@ kubectl exec -n dev deploy/redis-leader -- redis-cli GET guestbook
 
 ![Messages après le redémarrage de minikube](screenshots/26-redis-get-apres-redemarrage-minikube.png)
 
-✅ Les messages sont conservés : le disque persistant survit à l'arrêt du cluster.
+✅ Les messages sont conservés.
 
-> Après un redémarrage, relancer `minikube tunnel` et relire l'`EXTERNAL-IP` avec
-> `kubectl get svc frontend -n dev` : elle peut avoir changé.
+Ensuite, relancer `minikube tunnel` et relire l'`EXTERNAL-IP` (`kubectl get svc frontend -n dev`) :
+elle peut avoir changé.
 
 ---
 

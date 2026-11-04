@@ -1,9 +1,9 @@
 # Livre d'or Cloud — Documentation de transfert
 
-> **Pour qui ?** Pour l'équipe qui reprend l'exploitation de la plateforme.
-> **Objectif :** pouvoir tout réinstaller, utiliser et faire évoluer **avec cette seule documentation**.
+> **Pour qui ?** L'équipe qui reprend l'exploitation de la plateforme.
+> **Objectif :** tout réinstaller, utiliser et faire évoluer **avec cette seule documentation**.
 
-La documentation est découpée **en un fichier par partie**. Lire dans l'ordre la première fois.
+Un fichier par partie. Lire dans l'ordre la première fois.
 
 ## Sommaire
 
@@ -18,7 +18,7 @@ La documentation est découpée **en un fichier par partie**. Lire dans l'ordre 
 | 6 | [Les environnements dev / staging / prod](06-environnements-dev-staging-prod.md) | Installation, mise à jour, retour arrière | ✅ |
 | 7 | [Le cluster GKE avec Terraform](07-cluster-gke-terraform.md) | Création du cluster dans Google Cloud | ✅ |
 | 8 | [Le déploiement dans le cloud](08-deploiement-gke.md) | Connexion au cluster et mise en ligne | ✅ |
-| 9 | Exploitation | Runbooks, dépannage, limites connues | ⏳ à venir |
+| 9 | [Exploitation](09-exploitation.md) | Runbooks, référence, décisions, dépannage, limites connues | ✅ |
 
 ## En une phrase
 
@@ -28,7 +28,7 @@ La documentation est découpée **en un fichier par partie**. Lire dans l'ordre 
 
 ## Code couleur des schémas
 
-Les schémas de la documentation utilisent toujours les mêmes couleurs.
+Les couleurs sont les mêmes dans tous les schémas.
 
 | Couleur | Signification |
 |---|---|

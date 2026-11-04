@@ -1,0 +1,26 @@
+flowchart LR
+    CM[/"📝 ConfigMap<br/><b>redis-leader-config</b><br/>redis.conf"/]
+    PVC[("💾 PVC<br/><b>redis-leader-data</b><br/>1Gi · ReadWriteOnce")]
+    SC["🏭 StorageClass<br/>par défaut"]
+    PV[("💽 PV<br/>le vrai disque")]
+    D["📦 Deployment<br/><b>redis-leader</b><br/>Recreate"]
+    P["📕 Pod redis-leader"]
+
+    D ==>|"crée"| P
+    CM -.->|"monté sur /etc/redis"| P
+    PVC -.->|"monté sur /data"| P
+    PVC ==>|"① demande"| SC
+    SC ==>|"② fabrique"| PV
+    PV -.->|"③ Bound"| PVC
+    P ==>|"④ écrit chaque message"| PVC
+
+    classDef leader fill:#b91c1c,stroke:#fca5a5,color:#fff
+    classDef dep fill:#1d4ed8,stroke:#93c5fd,color:#fff
+    classDef cm fill:#a16207,stroke:#fde047,color:#fff
+    classDef disk fill:#c2410c,stroke:#fdba74,color:#fff
+    classDef tool fill:#475569,stroke:#cbd5e1,color:#fff
+    class P leader
+    class D dep
+    class CM cm
+    class PVC,PV disk
+    class SC tool
