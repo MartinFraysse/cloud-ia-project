@@ -151,3 +151,4 @@ tmp/
 # Notes personnelles (non versionnées)
 # -----------------------------------------------------------------------------
 Project-2/guide/
+.gstack/

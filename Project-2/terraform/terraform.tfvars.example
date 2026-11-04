@@ -1,0 +1,11 @@
+# terraform.tfvars.example — MODÈLE versionné. En début de session de lab :
+#   cp terraform.tfvars.example terraform.tfvars   puis remplacer les valeurs.
+# terraform.tfvars contient des identifiants de session : il n'est PAS versionné (.gitignore).
+
+# ID du projet : panneau "Lab details" du lab, ou `gcloud config get-value project`
+project_id = "qwiklabs-gcp-00-000000000000"
+
+# Région indiquée dans les instructions du lab (ex. us-central1, us-east1, europe-west1)
+region = "us-central1"
+
+# Les autres variables ont une valeur par défaut adaptée (voir variables.tf).
